@@ -8,6 +8,7 @@ namespace CursorMeter;
 public sealed class UsageClient : IDisposable
 {
     public const string UsageUrl = "https://api2.cursor.sh/aiserver.v1.DashboardService/GetCurrentPeriodUsage";
+    public const string WebUsageUrl = "https://cursor.com/api/dashboard/get-current-period-usage";
     public const string TokenUrl = "https://api2.cursor.sh/oauth/token";
     public const string ClientId = "KbZUR41cY7W6zRSdpSUJ7I7mLYBKOCmB";
 
@@ -52,6 +53,31 @@ public sealed class UsageClient : IDisposable
 
         return await ReadUsageAsync(first, cancellationToken).ConfigureAwait(false);
     }
+
+    public async Task<UsageQuotas> FetchWebAsync(string sessionCookie, CancellationToken cancellationToken = default)
+    {
+        if (!IsUsableCookie(sessionCookie))
+            throw new CursorAuthException("A sessão do Firefox em cursor.com não é válida.");
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, WebUsageUrl)
+        {
+            Content = new StringContent("{}", Encoding.UTF8, "application/json"),
+        };
+        request.Headers.TryAddWithoutValidation("Cookie", FirefoxSession.CookieName + "=" + sessionCookie.Trim());
+        request.Headers.TryAddWithoutValidation("Origin", "https://cursor.com");
+        request.Headers.TryAddWithoutValidation("Referer", "https://cursor.com/dashboard");
+        request.Headers.Accept.ParseAdd("application/json");
+        using var response = await _http.SendAsync(request, cancellationToken).ConfigureAwait(false);
+        if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+            throw new CursorAuthException("A sessão do Firefox em cursor.com expirou. Volta a entrar.");
+        return await ReadUsageAsync(response, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static bool IsUsableCookie(string? value)
+        => !string.IsNullOrWhiteSpace(value)
+            && !value.Contains(';')
+            && !value.Contains('\r')
+            && !value.Contains('\n');
 
     private async Task<HttpResponseMessage> SendUsageAsync(string accessToken, CancellationToken cancellationToken)
     {

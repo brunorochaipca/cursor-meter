@@ -76,31 +76,30 @@ internal sealed class MeterContext : ApplicationContext
         try
         {
             var session = CursorSession.TryLoadDefault();
-            if (session is null)
+            UsageQuotas quotas;
+            try
             {
-                Publish(
-                    "Abre o Cursor",
-                    "Sem sessão do Cursor",
-                    "Abre o Cursor e inicia sessão. Não precisas de colar um cookie.");
+                quotas = await LoadQuotasAsync(session).ConfigureAwait(false);
+            }
+            catch (CursorAuthException ex)
+            {
+                if (session is null)
+                {
+                    Publish(
+                        "Abre o Cursor",
+                        ex.Message,
+                        "Entra no Cursor ou em cursor.com no Firefox.");
+                }
+                else
+                {
+                    Publish("Sessão expirada", ex.Message, "Entra em cursor.com no Firefox.");
+                }
+
                 return;
             }
-
-            var quotas = await _client.FetchAsync(session).ConfigureAwait(false);
             var line = QuotaText.Line(quotas);
-            var bits = new List<string>();
-            if (!string.IsNullOrWhiteSpace(session.Plan))
-                bits.Add(session.Plan);
-            if (!string.IsNullOrWhiteSpace(session.Email))
-                bits.Add(session.Email);
-            var reset = QuotaText.ResetLabel(quotas.CycleEnd, DateTimeOffset.Now);
-            if (reset.Length > 0)
-                bits.Add(reset);
-            var secondary = bits.Count == 0 ? "Cada barra é a quota desse pool." : string.Join(" · ", bits);
+            var secondary = QuotaText.Summary(session?.Plan, session?.Email, quotas.CycleEnd, DateTimeOffset.Now);
             Publish(null, line, secondary, quotas);
-        }
-        catch (CursorAuthException ex)
-        {
-            Publish("Sessão expirada", ex.Message, "Volta a entrar no Cursor. Não é preciso cookie.");
         }
         catch (CursorUsageException ex)
         {
@@ -114,6 +113,30 @@ internal sealed class MeterContext : ApplicationContext
         {
             Interlocked.Exchange(ref _refreshing, 0);
         }
+    }
+
+    private async Task<UsageQuotas> LoadQuotasAsync(CursorSession? session)
+    {
+        if (session is not null)
+        {
+            try
+            {
+                return await _client.FetchAsync(session).ConfigureAwait(false);
+            }
+            catch (CursorAuthException)
+            {
+            }
+        }
+
+        var cookie = FirefoxSession.TryLoadDefault();
+        if (cookie is null)
+        {
+            throw new CursorAuthException(session is null
+                ? "Sem sessão do Cursor. Entra no Cursor ou em cursor.com no Firefox."
+                : "A sessão do Cursor expirou. Entra em cursor.com no Firefox.");
+        }
+
+        return await _client.FetchWebAsync(cookie).ConfigureAwait(false);
     }
 
     private void Publish(string? status, string detail, string? secondary, UsageQuotas? quotas = null)

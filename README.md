@@ -6,7 +6,7 @@ Duas barras na barra de tarefas do Windows, só para o Cursor:
 
 Cada barra é a quota desse pool no ciclo atual. Cursor Models corresponde a `autoPercentUsed`. Other Models corresponde a `apiPercentUsed`. São as mesmas duas percentagens do painel Usage.
 
-Não há cookie para colar. O cabeçalho Cookie que o TaskbarQuota pede é a sessão do browser em cursor.com; o Chrome e o Edge recentes cifram esses cookies, por isso a deteção automática falha. Esta aplicação não usa isso. Lê a sessão que o próprio Cursor gravou ao iniciares sessão, em `%APPDATA%\Cursor\User\globalStorage\state.vscdb`.
+Lê a sessão que o próprio Cursor gravou ao iniciares sessão, em `%APPDATA%\Cursor\User\globalStorage\state.vscdb`. Se essa sessão expirar, usa a sessão de cursor.com que estiver no Firefox.
 
 ## Instalar
 

@@ -53,6 +53,9 @@ public class QuotaTests
         Assert.Equal("reinicia em 9 dias", QuotaText.ResetLabel(end, now));
         Assert.Equal("reinicia amanhã", QuotaText.ResetLabel(now.AddHours(20), now));
         Assert.Equal("reinicia hoje", QuotaText.ResetLabel(now.AddHours(-1), now));
+        Assert.Equal(
+            "pro_plus · ana@example.com\nreinicia em 9 dias",
+            QuotaText.Summary("pro_plus", "ana@example.com", end, now));
     }
 
     [Fact]
@@ -187,6 +190,62 @@ public class QuotaTests
         Assert.Equal(12, quotas.CursorModelsPercent);
         Assert.Equal(8, quotas.OtherModelsPercent);
         Assert.Equal(3, calls);
+    }
+
+    [Fact]
+    public async Task Client_uses_the_firefox_cursor_session_for_the_dashboard()
+    {
+        var handler = new ScriptedHandler(request =>
+        {
+            Assert.Equal(UsageClient.WebUsageUrl, request.RequestUri?.ToString());
+            Assert.Equal("WorkosCursorSessionToken=user%3A%3Asession", request.Headers.GetValues("Cookie").Single());
+            Assert.Equal("https://cursor.com", request.Headers.GetValues("Origin").Single());
+            Assert.Null(request.Headers.Authorization);
+            return Json("""
+                {"planUsage":{"autoPercentUsed":7.6,"apiPercentUsed":28.7},"billingCycleEnd":"1796578977000"}
+                """);
+        });
+
+        using var client = new UsageClient(handler);
+        var quotas = await client.FetchWebAsync("user%3A%3Asession");
+
+        Assert.Equal("8% Cursor Models | 29% Other Models", QuotaText.Line(quotas));
+    }
+
+    [Fact]
+    public void Firefox_cookie_prefers_the_newest_live_cursor_session()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "cursormeter-" + Guid.NewGuid().ToString("n") + ".sqlite");
+        var expired = DateTimeOffset.UtcNow.AddDays(-2).ToUnixTimeSeconds();
+        var soon = DateTimeOffset.UtcNow.AddDays(10).ToUnixTimeSeconds();
+        var later = DateTimeOffset.UtcNow.AddDays(40).ToUnixTimeMilliseconds();
+        using (var connection = new SqliteConnection($"Data Source={path}"))
+        {
+            connection.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = """
+                CREATE TABLE moz_cookies (host TEXT, name TEXT, value TEXT, expiry INTEGER);
+                INSERT INTO moz_cookies (host, name, value, expiry) VALUES
+                  ('cursor.com', 'WorkosCursorSessionToken', 'expired', $expired),
+                  ('cursor.com', 'WorkosCursorSessionToken', 'soon', $soon),
+                  ('cursor.com', 'WorkosCursorSessionToken', 'later', $later),
+                  ('example.com', 'WorkosCursorSessionToken', 'other-site', $later),
+                  ('cursor.com', 'other', 'ignored', $later);
+                """;
+            command.Parameters.AddWithValue("$expired", expired);
+            command.Parameters.AddWithValue("$soon", soon);
+            command.Parameters.AddWithValue("$later", later);
+            command.ExecuteNonQuery();
+        }
+
+        try
+        {
+            Assert.Equal("later", FirefoxSession.TryReadDatabase(path));
+        }
+        finally
+        {
+            DeleteDatabase(path);
+        }
     }
 
     private static void DeleteDatabase(string path)

@@ -8,10 +8,19 @@ internal sealed class FlyoutForm : Form
         FormBorderStyle = FormBorderStyle.None;
         ShowInTaskbar = false;
         StartPosition = FormStartPosition.Manual;
-        Size = new Size(320, secondary is null ? 118 : 142);
+        Font = new Font("Segoe UI", 9f, FontStyle.Regular, GraphicsUnit.Point);
         BackColor = Color.FromArgb(24, 24, 24);
         ForeColor = Color.FromArgb(236, 234, 226);
-        Font = new Font("Segoe UI", 9f, FontStyle.Regular, GraphicsUnit.Point);
+
+        var note = secondary ?? "";
+        var noteSize = TextRenderer.MeasureText(
+            note,
+            Font,
+            new Size(288, int.MaxValue),
+            TextFormatFlags.WordBreak | TextFormatFlags.NoPadding);
+        var noteHeight = Math.Max(18, noteSize.Height + 4);
+        var buttonTop = 54 + noteHeight + 16;
+        ClientSize = new Size(320, buttonTop + 26 + 14);
 
         var line = new Label
         {
@@ -20,18 +29,20 @@ internal sealed class FlyoutForm : Form
             Text = detail,
             Font = new Font(Font, FontStyle.Bold),
             ForeColor = ForeColor,
+            UseMnemonic = false,
         };
         var extra = new Label
         {
             AutoSize = false,
-            Bounds = new Rectangle(16, 54, 288, 36),
-            Text = secondary ?? "",
+            Bounds = new Rectangle(16, 54, 288, noteHeight),
+            Text = note,
             ForeColor = Color.FromArgb(176, 172, 160),
+            UseMnemonic = false,
         };
         var button = new Button
         {
             Text = "Atualizar",
-            Bounds = new Rectangle(16, ClientSize.Height - 40, 96, 26),
+            Bounds = new Rectangle(16, buttonTop, 96, 26),
             FlatStyle = FlatStyle.Flat,
             BackColor = Color.FromArgb(44, 44, 44),
             ForeColor = ForeColor,
@@ -42,7 +53,7 @@ internal sealed class FlyoutForm : Form
         var dashboard = new Button
         {
             Text = "Painel do Cursor",
-            Bounds = new Rectangle(120, ClientSize.Height - 40, 130, 26),
+            Bounds = new Rectangle(120, buttonTop, 130, 26),
             FlatStyle = FlatStyle.Flat,
             BackColor = Color.FromArgb(44, 44, 44),
             ForeColor = ForeColor,

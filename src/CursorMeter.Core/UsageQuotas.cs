@@ -51,6 +51,23 @@ public static class QuotaText
         return $"reinicia em {days} dias";
     }
 
+    public static string Summary(string? plan, string? email, DateTimeOffset? cycleEnd, DateTimeOffset now)
+    {
+        var identity = new List<string>();
+        if (!string.IsNullOrWhiteSpace(plan))
+            identity.Add(plan.Trim());
+        if (!string.IsNullOrWhiteSpace(email))
+            identity.Add(email.Trim());
+
+        var lines = new List<string>();
+        if (identity.Count > 0)
+            lines.Add(string.Join(" · ", identity));
+        var reset = ResetLabel(cycleEnd, now);
+        if (reset.Length > 0)
+            lines.Add(reset);
+        return lines.Count == 0 ? "Cada barra é a quota desse pool." : string.Join("\n", lines);
+    }
+
     public static double BarFill(double percent)
     {
         if (double.IsNaN(percent) || percent <= 0)
