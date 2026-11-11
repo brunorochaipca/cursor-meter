@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <RootNamespace>CursorMeter.App</RootNamespace>
+    <AssemblyName>CursorMeter</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <Product>CursorMeter</Product>
+    <Version>1.0.0</Version>
+    <Description>Duas barras na barra de tarefas: Cursor Models e Other Models.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\CursorMeter.Core\CursorMeter.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="CursorMeter" />
+  </ItemGroup>
+</Project>
