@@ -8,14 +8,22 @@ Cada barra é a quota desse pool no ciclo atual. Cursor Models corresponde a `au
 
 Não há cookie para colar. O cabeçalho Cookie que o TaskbarQuota pede é a sessão do browser em cursor.com; o Chrome e o Edge recentes cifram esses cookies, por isso a deteção automática falha. Esta aplicação não usa isso. Lê a sessão que o próprio Cursor gravou ao iniciares sessão, em `%APPDATA%\Cursor\User\globalStorage\state.vscdb`.
 
-## Correr
+## Instalar
 
-No Windows, com o [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0):
+A release traz um instalador para Windows de 64 bits. Não pede administrador: o programa fica em `%LOCALAPPDATA%\Programs\CursorMeter` e aparece em Aplicações instaladas. A posição das barras continua em `%LOCALAPPDATA%\CursorMeter\offset.txt`, por isso uma reinstalação não a apaga.
+
+O Windows pode dizer que o publicador é desconhecido, porque o instalador não está assinado. No assistente podes deixar marcado o arranque com o Windows. O mesmo interruptor está no menu do botão direito.
+
+## Correr a partir do código
+
+No Windows, com o [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) e o [Inno Setup 6](https://jrsoftware.org/isdl.php) se fores gerar o instalador:
 
 ```powershell
 .\scripts\build-windows.ps1
 .\src\CursorMeter.App\bin\Release\net8.0-windows\win-x64\publish\CursorMeter.exe
 ```
+
+O instalador, `dist\CursorMeter-Setup-<versão>.exe`, sai de `.\scripts\build-installer.ps1`.
 
 O executável fica ao lado do relógio, dentro da barra de tarefas. Arrasta para o reposicionar. Clique abre o resumo. Botão direito: atualizar, abrir o painel, iniciar com o Windows, sair.
 

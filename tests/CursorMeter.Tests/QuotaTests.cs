@@ -107,7 +107,7 @@ public class QuotaTests
         }
         finally
         {
-            File.Delete(path);
+            DeleteDatabase(path);
         }
     }
 
@@ -140,7 +140,7 @@ public class QuotaTests
         }
         finally
         {
-            File.Delete(path);
+            DeleteDatabase(path);
         }
     }
 
@@ -187,6 +187,16 @@ public class QuotaTests
         Assert.Equal(12, quotas.CursorModelsPercent);
         Assert.Equal(8, quotas.OtherModelsPercent);
         Assert.Equal(3, calls);
+    }
+
+    private static void DeleteDatabase(string path)
+    {
+        SqliteConnection.ClearAllPools();
+        foreach (var candidate in new[] { path, path + "-wal", path + "-shm" })
+        {
+            if (File.Exists(candidate))
+                File.Delete(candidate);
+        }
     }
 
     private static HttpResponseMessage Json(string json)
