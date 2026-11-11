@@ -4,12 +4,14 @@ namespace CursorMeter.App;
 
 internal sealed class MeterContext : ApplicationContext
 {
-    private readonly WidgetForm _widget = new();
+    private WidgetForm _widget = null!;
+    private TaskbarEmbedder _embedder = null!;
     private readonly NotifyIcon _icon;
+    private readonly ContextMenuStrip _menu;
     private readonly UsageClient _client = new();
-    private readonly TaskbarEmbedder _embedder;
     private readonly System.Windows.Forms.Timer _usageTimer;
     private readonly System.Windows.Forms.Timer _placeTimer;
+    private readonly TaskbarWatcher _taskbarWatcher = new();
     private readonly Icon _iconImage;
     private int _refreshing;
     private string _detail = "A ler a utilização…";
@@ -18,11 +20,34 @@ internal sealed class MeterContext : ApplicationContext
     public MeterContext()
     {
         _iconImage = CreateIcon();
-        _embedder = new TaskbarEmbedder(_widget);
-        _widget.Dragged += (_, point) => _embedder.DragBy(point.X, point.Y);
-        _widget.RefreshRequested += (_, _) => _widget.ToggleFlyout(_detail, _secondary);
-        _widget.QuitRequested += (_, _) => ExitThread();
+        _menu = CreateMenu();
+        _icon = new NotifyIcon
+        {
+            Icon = _iconImage,
+            Visible = true,
+            Text = "CursorMeter",
+            ContextMenuStrip = _menu,
+        };
+        _icon.MouseClick += (_, e) =>
+        {
+            if (e.Button == MouseButtons.Left && !_widget.IsDisposed)
+                _widget.ToggleFlyout(_detail, _secondary);
+        };
 
+        _usageTimer = new System.Windows.Forms.Timer { Interval = 3 * 60 * 1000 };
+        _usageTimer.Tick += (_, _) => _ = RefreshAsync();
+        _placeTimer = new System.Windows.Forms.Timer { Interval = 2000 };
+        _placeTimer.Tick += (_, _) => KeepOnTaskbar();
+        _taskbarWatcher.Created += OnTaskbarCreated;
+
+        CreateWidget();
+        _usageTimer.Start();
+        _placeTimer.Start();
+        _ = RefreshAsync();
+    }
+
+    private ContextMenuStrip CreateMenu()
+    {
         var menu = new ContextMenuStrip();
         menu.Items.Add("Atualizar", null, (_, _) => _ = RefreshAsync());
         menu.Items.Add("Painel do Cursor", null, (_, _) => OpenDashboard());
@@ -40,33 +65,42 @@ internal sealed class MeterContext : ApplicationContext
         };
         menu.Items.Add(startup);
         menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add("Sair", null, (_, _) => _widget.RequestQuit());
-        _widget.ContextMenuStrip = menu;
-
-        _icon = new NotifyIcon
+        menu.Items.Add("Sair", null, (_, _) =>
         {
-            Icon = _iconImage,
-            Visible = true,
-            Text = "CursorMeter",
-            ContextMenuStrip = menu,
-        };
-        _icon.MouseClick += (_, e) =>
-        {
-            if (e.Button == MouseButtons.Left)
-                _widget.ToggleFlyout(_detail, _secondary);
-        };
+            if (!_widget.IsDisposed)
+                _widget.RequestQuit();
+        });
+        return menu;
+    }
 
-        _usageTimer = new System.Windows.Forms.Timer { Interval = 3 * 60 * 1000 };
-        _usageTimer.Tick += (_, _) => _ = RefreshAsync();
-        _placeTimer = new System.Windows.Forms.Timer { Interval = 2000 };
-        _placeTimer.Tick += (_, _) => _embedder.Place();
-
+    private void CreateWidget()
+    {
+        _widget = new WidgetForm();
+        _embedder = new TaskbarEmbedder(_widget);
+        _widget.Dragged += (_, point) => _embedder.DragTo(point.X, point.Y);
+        _widget.RefreshRequested += (_, _) => _widget.ToggleFlyout(_detail, _secondary);
+        _widget.QuitRequested += (_, _) => ExitThread();
+        _widget.ContextMenuStrip = _menu;
         _widget.HandleCreated += (_, _) => _embedder.Attach();
         _widget.Show();
         _embedder.Attach();
-        _usageTimer.Start();
-        _placeTimer.Start();
-        _ = RefreshAsync();
+    }
+
+    private void OnTaskbarCreated(object? sender, EventArgs e) => KeepOnTaskbar();
+
+    private void KeepOnTaskbar()
+    {
+        _icon.Visible = true;
+        if (_widget.IsDisposed || !NativeMethods.IsWindow(_widget.Handle))
+        {
+            CreateWidget();
+            return;
+        }
+
+        if (_widget.IsDragging)
+            return;
+
+        _embedder.Attach();
     }
 
     private async Task RefreshAsync()
@@ -155,6 +189,8 @@ internal sealed class MeterContext : ApplicationContext
                 _widget.Text = detail;
         }
 
+        if (_widget.IsDisposed)
+            return;
         if (_widget.IsHandleCreated && _widget.InvokeRequired)
             _widget.BeginInvoke(Apply);
         else
@@ -174,6 +210,8 @@ internal sealed class MeterContext : ApplicationContext
     {
         _usageTimer.Stop();
         _placeTimer.Stop();
+        _taskbarWatcher.Created -= OnTaskbarCreated;
+        _taskbarWatcher.ReleaseHandle();
         _icon.Visible = false;
         _icon.Dispose();
         _iconImage.Dispose();
@@ -204,6 +242,31 @@ internal sealed class MeterContext : ApplicationContext
         finally
         {
             NativeMethods.DestroyIcon(handle);
+        }
+    }
+
+    private sealed class TaskbarWatcher : NativeWindow
+    {
+        private readonly int _created;
+
+        public event EventHandler? Created;
+
+        public TaskbarWatcher()
+        {
+            _created = NativeMethods.RegisterWindowMessage("TaskbarCreated");
+            var parameters = new CreateParams
+            {
+                Caption = "CursorMeter.TaskbarWatcher",
+                ExStyle = 0x00000080,
+            };
+            CreateHandle(parameters);
+        }
+
+        protected override void WndProc(ref Message message)
+        {
+            if (_created != 0 && message.Msg == _created)
+                Created?.Invoke(this, EventArgs.Empty);
+            base.WndProc(ref message);
         }
     }
 }

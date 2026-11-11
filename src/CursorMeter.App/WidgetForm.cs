@@ -7,7 +7,10 @@ internal sealed class WidgetForm : Form
     private double? _other;
     private string _status = "A ler…";
     private bool _dragging;
-    private Point _dragStart;
+    private NativeMethods.Point _dragCursor;
+    private NativeMethods.Rect _dragWindow;
+
+    public bool IsDragging => _dragging;
     private FlyoutForm? _flyout;
 
     public WidgetForm()
@@ -104,11 +107,10 @@ internal sealed class WidgetForm : Form
     protected override void OnMouseDown(MouseEventArgs e)
     {
         base.OnMouseDown(e);
-        if (e.Button == MouseButtons.Left)
+        if (e.Button == MouseButtons.Left && NativeMethods.GetCursorPos(out _dragCursor) && NativeMethods.GetWindowRect(Handle, out _dragWindow))
         {
             _dragging = true;
-            _dragStart = e.Location;
-            Capture = true;
+            NativeMethods.SetCapture(Handle);
         }
     }
 
@@ -118,8 +120,10 @@ internal sealed class WidgetForm : Form
         if (e.Button != MouseButtons.Left || !_dragging)
             return;
         _dragging = false;
-        Capture = false;
-        var moved = Math.Abs(e.X - _dragStart.X) + Math.Abs(e.Y - _dragStart.Y);
+        NativeMethods.ReleaseCapture();
+        if (!NativeMethods.GetCursorPos(out var cursor))
+            return;
+        var moved = Math.Abs(cursor.X - _dragCursor.X) + Math.Abs(cursor.Y - _dragCursor.Y);
         if (moved <= 4)
             RefreshRequested?.Invoke(this, EventArgs.Empty);
     }
@@ -127,12 +131,11 @@ internal sealed class WidgetForm : Form
     protected override void OnMouseMove(MouseEventArgs e)
     {
         base.OnMouseMove(e);
-        if (!_dragging)
+        if (!_dragging || !NativeMethods.GetCursorPos(out var cursor))
             return;
-        if (Math.Abs(e.X - _dragStart.X) + Math.Abs(e.Y - _dragStart.Y) < 3)
+        if (Math.Abs(cursor.X - _dragCursor.X) + Math.Abs(cursor.Y - _dragCursor.Y) < 3)
             return;
-        var parentPoint = new Point(Left + e.X - _dragStart.X, Top + e.Y - _dragStart.Y);
-        Dragged?.Invoke(this, parentPoint);
+        Dragged?.Invoke(this, new Point(_dragWindow.Left + cursor.X - _dragCursor.X, _dragWindow.Top + cursor.Y - _dragCursor.Y));
     }
 
     public event EventHandler<Point>? Dragged;

@@ -6,6 +6,7 @@ internal static class NativeMethods
 {
     public const int GwlStyle = -16;
     public const int WsChild = 0x40000000;
+    public const int WsPopup = unchecked((int)0x80000000);
     public const int WsVisible = 0x10000000;
     public const int WsClipSiblings = 0x04000000;
     public const uint SwpNoActivate = 0x0010;
@@ -27,6 +28,15 @@ internal static class NativeMethods
     public static extern bool GetWindowRect(IntPtr hwnd, out Rect rect);
 
     [DllImport("user32.dll")]
+    public static extern bool GetCursorPos(out Point point);
+
+    [DllImport("user32.dll")]
+    public static extern IntPtr SetCapture(IntPtr hwnd);
+
+    [DllImport("user32.dll")]
+    public static extern bool ReleaseCapture();
+
+    [DllImport("user32.dll")]
     public static extern bool ScreenToClient(IntPtr hwnd, ref Point point);
 
     [DllImport("user32.dll", EntryPoint = "GetWindowLongW")]
@@ -43,6 +53,12 @@ internal static class NativeMethods
 
     [DllImport("user32.dll")]
     public static extern bool DestroyIcon(IntPtr handle);
+
+    [DllImport("user32.dll")]
+    public static extern bool IsWindow(IntPtr hwnd);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    public static extern int RegisterWindowMessage(string message);
 
     public const uint MonitorDefaultToNearest = 2;
 

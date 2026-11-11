@@ -21,6 +21,9 @@ internal sealed class TaskbarEmbedder
 
     public void Place(bool allowReparent = false)
     {
+        if (_widget.IsDisposed || !NativeMethods.IsWindow(_widget.Handle))
+            return;
+
         var taskbar = NativeMethods.FindWindow("Shell_TrayWnd", null);
         if (taskbar == IntPtr.Zero || !NativeMethods.GetWindowRect(taskbar, out var taskbarRect))
         {
@@ -33,13 +36,18 @@ internal sealed class TaskbarEmbedder
             ? found
             : default;
 
-        var taskbarClient = ToClient(taskbar, taskbarRect);
-        var trayClient = tray == IntPtr.Zero ? default : ToClient(taskbar, trayRect);
+        var taskbarClient = RelativeTo(taskbarRect, taskbarRect);
+        var trayClient = tray == IntPtr.Zero ? default : RelativeTo(taskbarRect, trayRect);
         var edge = TaskbarLayout.DetectEdge(ToPx(taskbarRect), MonitorOf(taskbar, taskbarRect));
         var slot = TaskbarLayout.Place(taskbarClient, trayClient, edge, _delta, _widget.Width, FitHeight(taskbarClient.Height));
 
-        if (allowReparent || Embedded)
+        if (allowReparent || NativeMethods.GetParent(_widget.Handle) != taskbar)
             Reparent(taskbar);
+        if (NativeMethods.GetParent(_widget.Handle) != taskbar)
+        {
+            DockFallback();
+            return;
+        }
 
         NativeMethods.SetWindowPos(
             _widget.Handle,
@@ -49,10 +57,9 @@ internal sealed class TaskbarEmbedder
             slot.Width,
             slot.Height,
             NativeMethods.SwpNoActivate | NativeMethods.SwpShowWindow);
-        _widget.Bounds = new Rectangle(slot.Left, slot.Top, slot.Width, slot.Height);
     }
 
-    public void DragBy(int x, int y)
+    public void DragTo(int screenLeft, int screenTop)
     {
         var taskbar = NativeMethods.FindWindow("Shell_TrayWnd", null);
         if (taskbar == IntPtr.Zero || !NativeMethods.GetWindowRect(taskbar, out var taskbarRect))
@@ -60,10 +67,13 @@ internal sealed class TaskbarEmbedder
 
         var tray = FindTray(taskbar);
         var trayRect = tray != IntPtr.Zero && NativeMethods.GetWindowRect(tray, out var found) ? found : default;
-        var taskbarClient = ToClient(taskbar, taskbarRect);
-        var trayClient = tray == IntPtr.Zero ? default : ToClient(taskbar, trayRect);
+        var taskbarClient = RelativeTo(taskbarRect, taskbarRect);
+        var trayClient = tray == IntPtr.Zero ? default : RelativeTo(taskbarRect, trayRect);
         var edge = TaskbarLayout.DetectEdge(ToPx(taskbarRect), MonitorOf(taskbar, taskbarRect));
-        var natural = TaskbarLayout.Place(taskbarClient, trayClient, edge, 0, _widget.Width, _widget.Height);
+        int height = FitHeight(taskbarClient.Height);
+        var natural = TaskbarLayout.Place(taskbarClient, trayClient, edge, 0, _widget.Width, height);
+        int x = screenLeft - taskbarRect.Left;
+        int y = screenTop - taskbarRect.Top;
         _delta = edge is BarEdge.Left or BarEdge.Right ? y - natural.Top : x - natural.Left;
         WriteDelta(_delta);
         Place();
@@ -77,20 +87,28 @@ internal sealed class TaskbarEmbedder
             return;
         }
 
-        NativeMethods.SetParent(_widget.Handle, taskbar);
-        if (NativeMethods.GetParent(_widget.Handle) != taskbar)
-            return;
-
         int style = NativeMethods.GetWindowLong(_widget.Handle, NativeMethods.GwlStyle);
+        style &= ~NativeMethods.WsPopup;
         style |= NativeMethods.WsChild | NativeMethods.WsVisible | NativeMethods.WsClipSiblings;
         NativeMethods.SetWindowLong(_widget.Handle, NativeMethods.GwlStyle, style);
-        Embedded = true;
-        _widget.TopMost = false;
+        NativeMethods.SetParent(_widget.Handle, taskbar);
+        Embedded = NativeMethods.GetParent(_widget.Handle) == taskbar;
+        if (Embedded)
+            _widget.TopMost = false;
     }
 
     private void DockFallback()
     {
         Embedded = false;
+        if (!_widget.IsDisposed && NativeMethods.IsWindow(_widget.Handle))
+        {
+            int style = NativeMethods.GetWindowLong(_widget.Handle, NativeMethods.GwlStyle);
+            style &= ~NativeMethods.WsChild;
+            style |= NativeMethods.WsPopup | NativeMethods.WsVisible;
+            NativeMethods.SetWindowLong(_widget.Handle, NativeMethods.GwlStyle, style);
+            NativeMethods.SetParent(_widget.Handle, IntPtr.Zero);
+        }
+
         var area = Screen.PrimaryScreen?.WorkingArea ?? new Rectangle(0, 0, 1280, 720);
         _widget.TopMost = true;
         _widget.Bounds = new Rectangle(area.Right - _widget.Width - 12, area.Bottom - _widget.Height - 8, _widget.Width, _widget.Height);
@@ -120,14 +138,12 @@ internal sealed class TaskbarEmbedder
         return IntPtr.Zero;
     }
 
-    private static PxRect ToClient(IntPtr parent, NativeMethods.Rect screen)
-    {
-        var topLeft = new NativeMethods.Point { X = screen.Left, Y = screen.Top };
-        var bottomRight = new NativeMethods.Point { X = screen.Right, Y = screen.Bottom };
-        NativeMethods.ScreenToClient(parent, ref topLeft);
-        NativeMethods.ScreenToClient(parent, ref bottomRight);
-        return new PxRect(topLeft.X, topLeft.Y, bottomRight.X, bottomRight.Y);
-    }
+    private static PxRect RelativeTo(NativeMethods.Rect origin, NativeMethods.Rect screen)
+        => new(
+            screen.Left - origin.Left,
+            screen.Top - origin.Top,
+            screen.Right - origin.Left,
+            screen.Bottom - origin.Top);
 
     private static PxRect ToPx(NativeMethods.Rect rect) => new(rect.Left, rect.Top, rect.Right, rect.Bottom);
 
