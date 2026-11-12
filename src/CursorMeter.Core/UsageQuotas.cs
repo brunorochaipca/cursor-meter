@@ -39,6 +39,11 @@ public static class QuotaText
     public static string Line(UsageQuotas quotas)
         => $"{Format(quotas.CursorModelsPercent)} Cursor Models | {Format(quotas.OtherModelsPercent)} Other Models";
 
+    public const string PanelLabelGuide = "Cursor 100% · Outros 100%";
+
+    public static string PanelLabel(UsageQuotas quotas)
+        => $"Cursor {Format(quotas.CursorModelsPercent)} · Outros {Format(quotas.OtherModelsPercent)}";
+
     public static string ResetLabel(DateTimeOffset? cycleEnd, DateTimeOffset now)
     {
         if (cycleEnd is null)

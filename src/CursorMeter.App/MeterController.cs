@@ -3,6 +3,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Threading;
+using CursorMeter.App.Linux;
 using CursorMeter.App.Windows;
 
 namespace CursorMeter.App;
@@ -21,7 +22,8 @@ internal sealed class MeterController : IDisposable
     private readonly IClassicDesktopStyleApplicationLifetime _lifetime;
     private readonly UsageClient _client = new();
     private readonly DispatcherTimer _usageTimer;
-    private readonly TrayIcon _tray;
+    private readonly TrayIcon? _tray;
+    private readonly StatusNotifierItem? _statusItem;
     private readonly TaskbarHost? _taskbar;
     private MeterState _state = MeterState.Loading;
     private FlyoutWindow? _flyout;
@@ -34,14 +36,23 @@ internal sealed class MeterController : IDisposable
         _lifetime = lifetime;
         var menu = CreateMenu();
 
-        _tray = new TrayIcon
+        if (OperatingSystem.IsLinux())
         {
-            Icon = AppIcon.Create(),
-            ToolTipText = "CursorMeter",
-            Menu = ToNativeMenu(menu),
-        };
-        _tray.Clicked += (_, _) => ToggleFlyout();
-        TrayIcon.SetIcons(Application.Current!, [_tray]);
+            _statusItem = StatusNotifierItem.TryCreate(menu, ToggleFlyout);
+            _statusItem?.Show(_state);
+        }
+
+        if (_statusItem is null)
+        {
+            _tray = new TrayIcon
+            {
+                Icon = AppIcon.Create(),
+                ToolTipText = "CursorMeter",
+                Menu = ToNativeMenu(menu),
+            };
+            _tray.Clicked += (_, _) => ToggleFlyout();
+            TrayIcon.SetIcons(Application.Current!, [_tray]);
+        }
 
         if (OperatingSystem.IsWindows())
         {
@@ -64,19 +75,23 @@ internal sealed class MeterController : IDisposable
         _usageTimer.Stop();
         _flyout?.Close();
         _taskbar?.Dispose();
-        _tray.Dispose();
+        _tray?.Dispose();
+        _statusItem?.Dispose();
         _client.Dispose();
     }
 
     private List<MenuEntry?> CreateMenu()
     {
-        var menu = new List<MenuEntry?>
-        {
-            new("Atualizar", () => _ = RefreshAsync()),
-            new("Painel do Cursor", OpenDashboard),
-        };
+        var menu = new List<MenuEntry?>();
+        // GNOME's AppIndicator extension opens the menu on a single left click and only activates on a double click.
+        if (OperatingSystem.IsLinux())
+            menu.Add(new("Mostrar resumo", ToggleFlyout));
+        menu.Add(new("Atualizar", () => _ = RefreshAsync()));
+        menu.Add(new("Painel do Cursor", OpenDashboard));
         if (OperatingSystem.IsWindows())
             menu.Add(StartupShortcut.MenuEntry());
+        if (OperatingSystem.IsLinux())
+            menu.Add(AutostartEntry.MenuEntry());
         menu.Add(null);
         menu.Add(new("Sair", Quit));
         return menu;
@@ -223,7 +238,10 @@ internal sealed class MeterController : IDisposable
         _state = state;
         _taskbar?.Show(state);
         _flyout?.ShowState(state);
-        _tray.ToolTipText = state.Detail.Length <= 63 ? state.Detail : state.Detail[..63];
+        _statusItem?.Show(state);
+        // NOTIFYICONDATA caps the Windows tooltip at 63 characters; StatusNotifierItem has no limit.
+        if (_tray is not null)
+            _tray.ToolTipText = !OperatingSystem.IsWindows() || state.Detail.Length <= 63 ? state.Detail : state.Detail[..63];
     }
 
     private void Quit()
@@ -232,12 +250,16 @@ internal sealed class MeterController : IDisposable
         _lifetime.Shutdown();
     }
 
-    private static void OpenDashboard()
+    private void OpenDashboard()
     {
         Process.Start(new ProcessStartInfo
         {
             FileName = DashboardUrl,
             UseShellExecute = true,
         });
+        // Mutter does not focus a browser started without an activation token, so nothing
+        // deactivates the flyout and it would stay on top of the dashboard.
+        if (OperatingSystem.IsLinux())
+            _flyout?.Close();
     }
 }

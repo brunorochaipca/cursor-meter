@@ -4,23 +4,24 @@ namespace CursorMeter;
 
 public sealed record CursorSession(string AccessToken, string? RefreshToken, string? Email, string? Plan)
 {
-    public static string WindowsDatabasePath()
+    public static string DatabasePath()
     {
-        var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData, Environment.SpecialFolderOption.DoNotVerify);
         return Path.Combine(appData, "Cursor", "User", "globalStorage", "state.vscdb");
     }
 
-    public static string WindowsCliAuthPath()
+    // The CLI title-cases its folder only on Windows; elsewhere it is $XDG_CONFIG_HOME/cursor.
+    public static string CliAuthPath()
     {
-        var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        return Path.Combine(appData, "Cursor", "auth.json");
+        var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData, Environment.SpecialFolderOption.DoNotVerify);
+        return Path.Combine(appData, OperatingSystem.IsWindows() ? "Cursor" : "cursor", "auth.json");
     }
 
     public static CursorSession? TryLoadDefault()
     {
         try
         {
-            return TryLoadDatabase(WindowsDatabasePath()) ?? TryLoadCliAuth(WindowsCliAuthPath());
+            return TryLoadDatabase(DatabasePath()) ?? TryLoadCliAuth(CliAuthPath());
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Text.Json.JsonException or SqliteException or CursorAuthException)
         {

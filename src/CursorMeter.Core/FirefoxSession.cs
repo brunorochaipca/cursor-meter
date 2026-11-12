@@ -8,37 +8,70 @@ public static class FirefoxSession
 
     public static string? TryLoadDefault()
     {
-        try
+        string? best = null;
+        long bestExpiry = long.MinValue;
+        foreach (var path in CookieDatabases())
         {
-            var root = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "Mozilla",
-                "Firefox",
-                "Profiles");
-            if (!Directory.Exists(root))
-                return null;
-
-            string? best = null;
-            long bestExpiry = long.MinValue;
-            foreach (var profile in Directory.EnumerateDirectories(root))
+            StoredCookie? found;
+            try
             {
-                var path = Path.Combine(profile, "cookies.sqlite");
-                if (!File.Exists(path))
-                    continue;
-                if (TryReadBest(path) is not { } cookie || IsExpired(cookie.Expiry))
-                    continue;
-                var expiry = Rank(cookie.Expiry);
-                if (expiry < bestExpiry)
-                    continue;
-                bestExpiry = expiry;
-                best = cookie.Value;
+                found = TryReadBest(path);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or SqliteException)
+            {
+                continue;
             }
 
-            return best;
+            if (found is not { } cookie || IsExpired(cookie.Expiry))
+                continue;
+            var expiry = Rank(cookie.Expiry);
+            if (expiry < bestExpiry)
+                continue;
+            bestExpiry = expiry;
+            best = cookie.Value;
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or SqliteException)
+
+        return best;
+    }
+
+    public static IEnumerable<string> ProfileRoots()
+    {
+        var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData, Environment.SpecialFolderOption.DoNotVerify);
+        if (OperatingSystem.IsWindows())
         {
-            return null;
+            yield return Path.Combine(appData, "Mozilla", "Firefox", "Profiles");
+            yield break;
+        }
+
+        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile, Environment.SpecialFolderOption.DoNotVerify);
+        yield return Path.Combine(home, ".mozilla", "firefox");
+        yield return Path.Combine(home, "snap", "firefox", "common", ".mozilla", "firefox");
+        yield return Path.Combine(home, ".var", "app", "org.mozilla.firefox", ".mozilla", "firefox");
+        yield return Path.Combine(appData, "mozilla", "firefox");
+    }
+
+    private static IEnumerable<string> CookieDatabases()
+    {
+        foreach (var root in ProfileRoots().Distinct(StringComparer.Ordinal))
+        {
+            string[] profiles;
+            try
+            {
+                if (!Directory.Exists(root))
+                    continue;
+                profiles = Directory.GetDirectories(root);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                continue;
+            }
+
+            foreach (var profile in profiles)
+            {
+                var path = Path.Combine(profile, "cookies.sqlite");
+                if (File.Exists(path))
+                    yield return path;
+            }
         }
     }
 

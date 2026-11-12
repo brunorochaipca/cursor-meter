@@ -15,6 +15,8 @@
     <PackageReference Include="Avalonia" Version="11.3.23" />
     <PackageReference Include="Avalonia.Desktop" Version="11.3.23" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.23" />
+    <!-- Same version Avalonia.FreeDesktop already brings in. -->
+    <PackageReference Include="Tmds.DBus.Protocol" Version="0.21.3" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\CursorMeter.Core\CursorMeter.Core.csproj" />
