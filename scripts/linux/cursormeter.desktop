@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=CursorMeter
+Comment=Cursor Models | Other Models
+Exec=@EXEC@
+Icon=cursormeter
+Terminal=false
+Categories=Utility;
+StartupNotify=false
