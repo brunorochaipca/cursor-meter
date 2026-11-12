@@ -3,6 +3,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Threading;
+using CursorMeter.App.Linux;
 using CursorMeter.App.Windows;
 
 namespace CursorMeter.App;
@@ -70,13 +71,16 @@ internal sealed class MeterController : IDisposable
 
     private List<MenuEntry?> CreateMenu()
     {
-        var menu = new List<MenuEntry?>
-        {
-            new("Atualizar", () => _ = RefreshAsync()),
-            new("Painel do Cursor", OpenDashboard),
-        };
+        var menu = new List<MenuEntry?>();
+        // AppIndicator hosts open the menu on a left click instead of activating the icon.
+        if (OperatingSystem.IsLinux())
+            menu.Add(new("Mostrar resumo", ToggleFlyout));
+        menu.Add(new("Atualizar", () => _ = RefreshAsync()));
+        menu.Add(new("Painel do Cursor", OpenDashboard));
         if (OperatingSystem.IsWindows())
             menu.Add(StartupShortcut.MenuEntry());
+        if (OperatingSystem.IsLinux())
+            menu.Add(AutostartEntry.MenuEntry());
         menu.Add(null);
         menu.Add(new("Sair", Quit));
         return menu;
@@ -223,7 +227,8 @@ internal sealed class MeterController : IDisposable
         _state = state;
         _taskbar?.Show(state);
         _flyout?.ShowState(state);
-        _tray.ToolTipText = state.Detail.Length <= 63 ? state.Detail : state.Detail[..63];
+        // NOTIFYICONDATA caps the Windows tooltip at 63 characters; StatusNotifierItem has no limit.
+        _tray.ToolTipText = !OperatingSystem.IsWindows() || state.Detail.Length <= 63 ? state.Detail : state.Detail[..63];
     }
 
     private void Quit()
