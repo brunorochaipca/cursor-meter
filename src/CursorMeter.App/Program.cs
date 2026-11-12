@@ -8,7 +8,9 @@ internal static class Program
     [STAThread]
     private static int Main(string[] args)
     {
-        using var mutex = new Mutex(true, @"Local\CursorMeter", out var created);
+        // On Unix, Local\ is scoped to the terminal session, so the desktop menu, autostart and a shell would each get their own.
+        var name = OperatingSystem.IsWindows() ? @"Local\CursorMeter" : @"Global\CursorMeter-" + Environment.UserName;
+        using var mutex = new Mutex(true, name, out var created);
         if (!created)
             return 0;
 
