@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using Avalonia;
+using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using Avalonia.Threading;
 using Tmds.DBus.Protocol;
@@ -17,6 +18,7 @@ internal sealed class StatusNotifierItem : IMethodHandler, IDisposable
     private const string WatcherName = "org.kde.StatusNotifierWatcher";
     private const string PropertiesInterface = "org.freedesktop.DBus.Properties";
     private const uint DoNotQueue = 4;
+    private const string IconFileName = "cursormeter-tray";
 
     private static readonly string[] PropertyNames =
     [
@@ -48,6 +50,7 @@ internal sealed class StatusNotifierItem : IMethodHandler, IDisposable
           <method name="ContextMenu"><arg name="x" type="i" direction="in"/><arg name="y" type="i" direction="in"/></method>
           <method name="Activate"><arg name="x" type="i" direction="in"/><arg name="y" type="i" direction="in"/></method>
           <method name="SecondaryActivate"><arg name="x" type="i" direction="in"/><arg name="y" type="i" direction="in"/></method>
+          <method name="XAyatanaSecondaryActivate"><arg name="timestamp" type="u" direction="in"/></method>
           <method name="Scroll"><arg name="delta" type="i" direction="in"/><arg name="orientation" type="s" direction="in"/></method>
           <signal name="NewTitle"/>
           <signal name="NewIcon"/>
@@ -63,7 +66,8 @@ internal sealed class StatusNotifierItem : IMethodHandler, IDisposable
     private readonly DBusMenu _menu;
     private readonly Action _activate;
     private readonly string _busName = $"org.kde.StatusNotifierItem-{Environment.ProcessId}-1";
-    private readonly byte[] _iconArgb = IconArgb();
+    private readonly byte[] _iconArgb;
+    private readonly string _iconThemePath;
     private IDisposable? _watcherSubscription;
     private volatile string _label = "";
     private volatile string _toolTip = "";
@@ -74,6 +78,9 @@ internal sealed class StatusNotifierItem : IMethodHandler, IDisposable
         _connection = connection;
         _menu = new DBusMenu(connection, menu);
         _activate = activate;
+        using var icon = AppIcon.Render();
+        _iconArgb = IconArgb(icon);
+        _iconThemePath = WriteIconFile(icon);
     }
 
     /// <summary>
@@ -144,7 +151,7 @@ internal sealed class StatusNotifierItem : IMethodHandler, IDisposable
         var request = context.Request;
         switch (request.InterfaceAsString, request.MemberAsString)
         {
-            case (ItemInterface or null, "Activate" or "SecondaryActivate"):
+            case (ItemInterface or null, "Activate" or "SecondaryActivate" or "XAyatanaSecondaryActivate"):
                 Dispatcher.UIThread.Post(_activate);
                 ReplyEmpty(context);
                 break;
@@ -305,7 +312,13 @@ internal sealed class StatusNotifierItem : IMethodHandler, IDisposable
             case "WindowId":
                 writer.WriteVariantInt32(0);
                 return true;
-            case "IconThemePath" or "IconName" or "OverlayIconName" or "AttentionIconName" or "AttentionMovieName":
+            case "IconThemePath":
+                writer.WriteVariantString(_iconThemePath);
+                return true;
+            case "IconName":
+                writer.WriteVariantString(_iconThemePath.Length > 0 ? IconFileName : "");
+                return true;
+            case "OverlayIconName" or "AttentionIconName" or "AttentionMovieName":
                 writer.WriteVariantString("");
                 return true;
             case "IconPixmap":
@@ -361,10 +374,31 @@ internal sealed class StatusNotifierItem : IMethodHandler, IDisposable
             context.Reply(context.CreateReplyWriter(null).CreateMessage());
     }
 
-    // StatusNotifierItem pixmaps are ARGB32 in network byte order. The icon is opaque, so premultiplied alpha changes nothing.
-    private static byte[] IconArgb()
+    // Ayatana's indicator service (the Xfce and MATE indicator plugins) only loads icons by name, so the
+    // pixmap is also written where IconThemePath points. Hosts that prefer the name draw the same image.
+    private static string WriteIconFile(RenderTargetBitmap bitmap)
     {
-        using var bitmap = AppIcon.Render();
+        var runtimeDir = Environment.GetEnvironmentVariable("XDG_RUNTIME_DIR");
+        if (string.IsNullOrEmpty(runtimeDir))
+            return "";
+        try
+        {
+            var dir = System.IO.Path.Combine(runtimeDir, "cursormeter");
+            Directory.CreateDirectory(dir);
+            var file = System.IO.Path.Combine(dir, IconFileName + ".png");
+            bitmap.Save(file + ".tmp");
+            File.Move(file + ".tmp", file, overwrite: true);
+            return dir;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return "";
+        }
+    }
+
+    // StatusNotifierItem pixmaps are ARGB32 in network byte order. The icon is opaque, so premultiplied alpha changes nothing.
+    private static byte[] IconArgb(RenderTargetBitmap bitmap)
+    {
         var pixels = new byte[AppIcon.Size * AppIcon.Size * 4];
         var handle = GCHandle.Alloc(pixels, GCHandleType.Pinned);
         try
