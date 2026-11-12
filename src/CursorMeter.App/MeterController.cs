@@ -237,12 +237,16 @@ internal sealed class MeterController : IDisposable
         _lifetime.Shutdown();
     }
 
-    private static void OpenDashboard()
+    private void OpenDashboard()
     {
         Process.Start(new ProcessStartInfo
         {
             FileName = DashboardUrl,
             UseShellExecute = true,
         });
+        // Mutter does not focus a browser started without an activation token, so nothing
+        // deactivates the flyout and it would stay on top of the dashboard.
+        if (OperatingSystem.IsLinux())
+            _flyout?.Close();
     }
 }
