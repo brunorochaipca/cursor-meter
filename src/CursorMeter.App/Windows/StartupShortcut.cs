@@ -1,5 +1,8 @@
-namespace CursorMeter.App;
+using System.Runtime.Versioning;
 
+namespace CursorMeter.App.Windows;
+
+[SupportedOSPlatform("windows")]
 internal static class StartupShortcut
 {
     public static string LinkPath => Path.Combine(
@@ -7,6 +10,8 @@ internal static class StartupShortcut
         "CursorMeter.lnk");
 
     public static bool IsEnabled => File.Exists(LinkPath);
+
+    public static MenuEntry MenuEntry() => new("Iniciar com o Windows", Toggle, () => IsEnabled);
 
     public static void SetEnabled(bool enabled)
     {
@@ -23,9 +28,20 @@ internal static class StartupShortcut
             ?? throw new InvalidOperationException("WScript.Shell não está disponível.");
         dynamic shell = shellObject;
         dynamic shortcut = shell.CreateShortcut(LinkPath);
-        shortcut.TargetPath = Application.ExecutablePath;
+        shortcut.TargetPath = Environment.ProcessPath;
         shortcut.WorkingDirectory = AppContext.BaseDirectory;
         shortcut.Description = "Cursor Models | Other Models";
         shortcut.Save();
+    }
+
+    private static void Toggle()
+    {
+        try
+        {
+            SetEnabled(!IsEnabled);
+        }
+        catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException)
+        {
+        }
     }
 }

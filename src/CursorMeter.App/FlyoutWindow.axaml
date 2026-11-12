@@ -1,0 +1,32 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="CursorMeter.App.FlyoutWindow"
+        Title="CursorMeter"
+        Width="320"
+        SizeToContent="Height"
+        SystemDecorations="None"
+        CanResize="False"
+        ShowInTaskbar="False"
+        Topmost="True"
+        WindowStartupLocation="Manual"
+        Background="#181818"
+        FontSize="12">
+  <Border BorderBrush="#464646" BorderThickness="1" Padding="16,14,16,14">
+    <StackPanel>
+      <TextBlock x:Name="DetailText"
+                 MinHeight="40"
+                 FontWeight="SemiBold"
+                 Foreground="#ECEAE2"
+                 TextWrapping="Wrap" />
+      <TextBlock x:Name="SecondaryText"
+                 MinHeight="18"
+                 Margin="0,0,0,16"
+                 Foreground="#B0ACA0"
+                 TextWrapping="Wrap" />
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <Button x:Name="RefreshButton" Content="Atualizar" MinWidth="96" />
+        <Button x:Name="DashboardButton" Content="Painel do Cursor" MinWidth="130" />
+      </StackPanel>
+    </StackPanel>
+  </Border>
+</Window>

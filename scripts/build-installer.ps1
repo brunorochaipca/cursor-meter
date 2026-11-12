@@ -2,7 +2,7 @@ $ErrorActionPreference = "Stop"
 
 $root = Resolve-Path (Join-Path $PSScriptRoot "..")
 $project = Join-Path $root "src\CursorMeter.App\CursorMeter.App.csproj"
-$publish = Join-Path $root "src\CursorMeter.App\bin\Release\net8.0-windows\win-x64\publish"
+$publish = Join-Path $root "src\CursorMeter.App\bin\Release\net8.0\win-x64\publish"
 $iss = Join-Path $PSScriptRoot "CursorMeter.iss"
 
 [xml]$proj = Get-Content -Path $project

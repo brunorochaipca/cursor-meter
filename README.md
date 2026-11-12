@@ -20,7 +20,7 @@ No Windows, com o [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
 
 ```powershell
 .\scripts\build-windows.ps1
-.\src\CursorMeter.App\bin\Release\net8.0-windows\win-x64\publish\CursorMeter.exe
+.\src\CursorMeter.App\bin\Release\net8.0\win-x64\publish\CursorMeter.exe
 ```
 
 O instalador, `dist\CursorMeter-Setup-<versão>.exe`, sai de `.\scripts\build-installer.ps1`.
@@ -31,8 +31,8 @@ A posição fica em `%LOCALAPPDATA%\CursorMeter\offset.txt`.
 
 ## O que o .NET precisa de ter
 
-- SDK .NET 8, para compilar.
-- No Windows, o workload de ambiente de trabalho (`net8.0-windows` / Windows Forms), que vem com o SDK instalado no Windows.
+- SDK .NET 8, para compilar. O projeto aponta para `net8.0`, sem workloads de Windows.
+- A interface é [Avalonia](https://avaloniaui.net/) 11.3, que vem do NuGet. O Avalonia 12 exige uma SDK .NET 9.0.300 ou mais recente para compilar, por isso fica de fora enquanto o `global.json` fixar a SDK 8.
 - Não é preciso o Windows App SDK nem o WinUI do TaskbarQuota.
 
-A lógica (sessão, pedido, texto das percentagens, posição na barra) corre em qualquer sistema com o SDK. A janela da barra de tarefas só existe no Windows.
+A lógica (sessão, pedido, texto das percentagens, posição na barra) está em `CursorMeter.Core` e corre em qualquer sistema. O ícone na área de notificação, o resumo e o menu são Avalonia e também. As barras dentro da barra de tarefas são Win32 e só existem no Windows (`src/CursorMeter.App/Windows`).

@@ -1,17 +1,21 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0-windows</TargetFramework>
-    <UseWindowsForms>true</UseWindowsForms>
-    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <TargetFramework>net8.0</TargetFramework>
     <RootNamespace>CursorMeter.App</RootNamespace>
     <AssemblyName>CursorMeter</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <Product>CursorMeter</Product>
-    <Version>1.0.2</Version>
+    <Version>1.1.0</Version>
     <Description>Duas barras na barra de tarefas: Cursor Models e Other Models.</Description>
   </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="11.3.23" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.3.23" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.23" />
+  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\CursorMeter.Core\CursorMeter.Core.csproj" />
   </ItemGroup>

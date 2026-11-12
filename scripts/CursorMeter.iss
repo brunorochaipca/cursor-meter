@@ -8,7 +8,7 @@
   #define VersionInfoVersion "1.0.0.0"
 #endif
 #ifndef PublishDir
-  #define PublishDir "..\src\CursorMeter.App\bin\Release\net8.0-windows\win-x64\publish"
+  #define PublishDir "..\src\CursorMeter.App\bin\Release\net8.0\win-x64\publish"
 #endif
 
 #define MyAppName "CursorMeter"
