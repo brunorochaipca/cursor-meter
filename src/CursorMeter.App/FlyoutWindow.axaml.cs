@@ -62,7 +62,10 @@ internal sealed partial class FlyoutWindow : Window
 
     private void Reposition()
     {
-        var screen = (_anchor is { } a ? Screens.ScreenFromPoint(a.TopLeft) : null) ?? Screens.Primary;
+        // X11 has no primary screen unless RandR was told which output it is.
+        var screen = (_anchor is { } a ? Screens.ScreenFromPoint(a.TopLeft) : null)
+            ?? Screens.Primary
+            ?? Screens.All.FirstOrDefault();
         if (screen is null || Bounds.Height <= 0)
             return;
 
