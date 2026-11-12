@@ -26,7 +26,7 @@ cd CursorMeter-<versão>-linux-x64
 
 O programa fica em `~/.local/share/cursormeter`, a entrada nas aplicações em `~/.local/share/applications` e o ícone em `~/.local/share/icons/hicolor/scalable/apps`. Com `--autostart` arranca com a sessão. O mesmo interruptor está no menu, "Iniciar com a sessão", e grava `~/.config/autostart/cursormeter.desktop`. Para desinstalar: `~/.local/share/cursormeter/uninstall.sh`.
 
-No Ubuntu não há barras dentro do painel. Fica um ícone na área de notificação, ao lado do relógio, e o resumo abre no canto, junto ao painel. Conforme o painel, o clique no ícone abre o resumo ou o menu. O menu tem sempre: mostrar resumo, atualizar, abrir o painel, iniciar com a sessão, sair.
+No Ubuntu não há barras dentro do painel. Fica um ícone na área de notificação, ao lado do relógio, e o resumo abre no canto, junto ao painel. Conforme o painel, o clique no ícone abre o resumo ou o menu. O menu tem sempre: mostrar resumo, atualizar, abrir o painel, iniciar com a sessão, sair. No GNOME, um clique simples abre o menu e um duplo clique abre o resumo. O resumo fecha com Esc, com um clique noutra janela ou no ambiente de trabalho, mas não com um clique na barra superior.
 
 O ícone precisa de um painel com suporte para AppIndicator (StatusNotifierItem). O Ubuntu traz a extensão Ubuntu AppIndicators ativa por omissão. Noutras instalações do GNOME, instala `gnome-shell-extension-appindicator` e ativa-a nas Extensões. Xfce e KDE já mostram estes ícones.
 
