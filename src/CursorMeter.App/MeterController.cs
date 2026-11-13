@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Diagnostics;
 using Avalonia;
 using Avalonia.Controls;
@@ -252,11 +253,30 @@ internal sealed class MeterController : IDisposable
 
     private void OpenDashboard()
     {
-        Process.Start(new ProcessStartInfo
+        try
         {
-            FileName = DashboardUrl,
-            UseShellExecute = true,
-        });
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = DashboardUrl,
+                UseShellExecute = true,
+            });
+        }
+        catch (Exception ex) when (ex is Win32Exception or InvalidOperationException or PlatformNotSupportedException)
+        {
+            // The click runs on the UI thread. On Linux, UseShellExecute throws when xdg-open,
+            // gnome-open and kfmclient are all missing, and that exception would end the process.
+            Publish(_state with
+            {
+                Detail = "Não consegui abrir o painel.",
+                Secondary = OperatingSystem.IsLinux()
+                    ? "Instala o pacote xdg-utils."
+                    : "Não há um programa associado a este endereço.",
+            });
+            if (_flyout is null)
+                ToggleFlyout();
+            return;
+        }
+
         // Mutter does not focus a browser started without an activation token, so nothing
         // deactivates the flyout and it would stay on top of the dashboard.
         if (OperatingSystem.IsLinux())
