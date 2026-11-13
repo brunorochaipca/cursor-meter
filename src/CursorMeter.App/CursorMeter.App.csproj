@@ -8,7 +8,7 @@
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <Product>CursorMeter</Product>
-    <Version>1.2.0</Version>
+    <Version>1.2.1</Version>
     <Description>Duas barras na barra de tarefas: Cursor Models e Other Models.</Description>
   </PropertyGroup>
   <ItemGroup>
