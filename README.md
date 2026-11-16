@@ -1,18 +1,63 @@
 # CursorMeter
 
-Duas barras na barra de tarefas do Windows, só para o Cursor:
+O consumo do Cursor sempre à vista: duas barras, uma por pool de quota, sem abrires o painel Usage.
 
-`37% Cursor Models | 64% Other Models`
+```
+Cursor Models  ▰▰▱▱▱▱▱▱  15%
+Other Models   ▰▰▰▰▰▰▱▱  75%
+```
 
 Cada barra é a quota desse pool no ciclo atual. Cursor Models corresponde a `autoPercentUsed`. Other Models corresponde a `apiPercentUsed`. São as mesmas duas percentagens do painel Usage.
 
-Lê a sessão que o próprio Cursor gravou ao iniciares sessão, em `%APPDATA%\Cursor\User\globalStorage\state.vscdb`. Se essa sessão expirar, usa a sessão de cursor.com que estiver no Firefox.
+Lê a sessão que o próprio Cursor gravou ao iniciares sessão, em `%APPDATA%\Cursor\User\globalStorage\state.vscdb`. Se essa sessão expirar, usa a sessão de cursor.com que estiver no Firefox. Não envia nada para além do pedido de uso ao próprio Cursor.
 
-## Instalar
+## Para quem é
 
-A release traz um instalador para Windows de 64 bits. Não pede administrador: o programa fica em `%LOCALAPPDATA%\Programs\CursorMeter` e aparece em Aplicações instaladas. A posição das barras continua em `%LOCALAPPDATA%\CursorMeter\offset.txt`, por isso uma reinstalação não a apaga.
+No **Windows**, a aplicação foi pensada para o Windows 11 com o [Start11 v3](https://www.stardock.com/products/start11/), da Stardock. O Start11 v3 trouxe as "ilhas" da barra de tarefas: em vez de uma faixa de lado a lado, a barra passa a blocos arredondados, como num dock. O CursorMeter replica esse conceito e apresenta-se como mais uma ilha, com o mesmo aspeto das que o Start11 desenha.
+
+No **Ubuntu**, é um ícone na área de notificação com as percentagens ao lado. Ver [Ubuntu](#ubuntu).
+
+## Windows
+
+### A configuração pensada
+
+No Start11 v3, ativa as ilhas da barra de tarefas (Taskbar Islands) e usa o alinhamento **tudo ao centro**: o botão Iniciar e os ícones juntos numa ilha ao centro, e a área de notificação noutra, à direita. O espaço livre à esquerda fica para o CursorMeter, que ocupa o **canto esquerdo** como uma ilha própria e fica sempre fixo ali.
+
+```
+┌──────────────────┐        ┌─────────────────────────┐        ┌─────────────┐
+│ Cursor Models 15%│        │  ⊞  🗂  📁  🛍  🦊  …    │        │  ^ 📶 🔊 🔋  │
+│ Other Models  75%│        │                         │        │  19:38      │
+└──────────────────┘        └─────────────────────────┘        └─────────────┘
+   CursorMeter                 Start11, ícones                    Notificações
+```
+
+A ilha:
+
+- **Encaixa sozinha.** A aplicação lê a forma que o Start11 dá à barra de tarefas (a região da janela) e deduz onde estão as ilhas, a altura e o raio dos cantos. Não usa valores fixos para o zoom ou a resolução, por isso acompanha o zoom de cada monitor. A margem à esquerda é igual à que a ilha da direita tem à direita.
+- **Usa as cores do Start11.** O preenchimento, a cor e a espessura do contorno (1, 1,25, 1,5 ou 2 px) vêm das definições da barra de tarefas do Start11. Se as mudares, a ilha acompanha em poucos segundos. O contorno é suavizado e misturado com o fundo, como o do Start11.
+- **Fica sempre visível.** A ilha não é tapada ao abrir o menu Iniciar do Start11, ao clicar num ícone da barra ou com uma janela maximizada. Só a Vista de Tarefas (Win+Tab) a tapa, como a qualquer outra janela, e volta logo ao fechar.
+- **Fica fixa.** Não se arrasta. Clique abre o resumo, junto à ilha. Botão direito: atualizar, abrir o painel, iniciar com o Windows, sair.
+
+Testado com o Start11 v3 beta, no Windows 11, a 125% de zoom, com a barra em baixo. A barra no topo ou vertical não usa o modo ilha.
+
+### Sem o Start11 v3, ou sem ilhas
+
+A aplicação continua a funcionar, com o comportamento anterior. Se as ilhas estiverem desligadas, se o Start11 não estiver instalado, ou se a primeira ilha começar encostada à esquerda e não houver espaço (alinhamento à esquerda), as barras aparecem numa caixa ao lado da área de notificação, junto ao relógio.
+
+- **Windows 10:** as barras ficam dentro da barra de tarefas.
+- **Windows 11:** o sistema não mostra uma janela metida na barra: à escala de 100% não aparece nada, e à de 125% só aparece porque o Windows a amplia. As barras são desenhadas por cima da barra, no mesmo sítio, e seguem a escala do monitor.
+- **Menu Iniciar e Vista de Tarefas:** com o menu Iniciar do Windows aberto, ou com a Vista de Tarefas, o Windows põe a barra por cima de qualquer janela normal, por isso as barras sobem para imediatamente acima dela e voltam ao sítio quando fecha. Um clique num ícone da barra também não as esconde.
+- **Posição:** arrasta para reposicionar. Fica em `%LOCALAPPDATA%\CursorMeter\offset.txt`.
+
+Se numa máquina não aparecerem, `.\scripts\debug-taskbar.ps1` diz a escala, o DPI da barra e se a janela está por baixo dela.
+
+### Instalar
+
+A release traz um instalador para Windows de 64 bits. Não pede administrador: o programa fica em `%LOCALAPPDATA%\Programs\CursorMeter` e aparece em Aplicações instaladas. A posição das barras, quando não estás no modo ilha, continua em `%LOCALAPPDATA%\CursorMeter\offset.txt`, por isso uma reinstalação não a apaga.
 
 O Windows pode dizer que o publicador é desconhecido, porque o instalador não está assinado. No assistente podes deixar marcado o arranque com o Windows. O mesmo interruptor está no menu do botão direito.
+
+O Start11 é um produto da Stardock, pago e independente deste projeto. O CursorMeter não o inclui nem tem qualquer ligação à Stardock.
 
 ## Ubuntu
 
@@ -58,11 +103,7 @@ No Windows, com o [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
 
 O instalador, `dist\CursorMeter-Setup-<versão>.exe`, sai de `.\scripts\build-installer.ps1`.
 
-O executável fica ao lado do relógio, na barra de tarefas. Arrasta para o reposicionar. Clique abre o resumo. Botão direito: atualizar, abrir o painel, iniciar com o Windows, sair.
-
-No Windows 10 as barras ficam dentro da barra. No Windows 11 (o 26H2 incluído) o sistema não mostra uma janela metida na barra: à escala de 100% não aparece nada, e à de 125% só aparece porque o Windows a amplia. As barras são desenhadas por cima da barra, no mesmo sítio, e seguem a escala do monitor. Com o menu Iniciar aberto, o Windows põe a barra por cima de qualquer janela normal, por isso as barras sobem para imediatamente acima dela e voltam ao sítio quando o menu fecha. Se numa máquina não aparecerem, `.\scripts\debug-taskbar.ps1` diz a escala, o DPI da barra e se a janela está por baixo dela.
-
-A posição fica em `%LOCALAPPDATA%\CursorMeter\offset.txt`.
+As barras aparecem na barra de tarefas, como descrito em [Windows](#windows).
 
 ## O que o .NET precisa de ter
 
@@ -70,4 +111,4 @@ A posição fica em `%LOCALAPPDATA%\CursorMeter\offset.txt`.
 - A interface é [Avalonia](https://avaloniaui.net/) 11.3, que vem do NuGet. O Avalonia 12 exige uma SDK .NET 9.0.300 ou mais recente para compilar, por isso fica de fora enquanto o `global.json` fixar a SDK 8.
 - Não é preciso o Windows App SDK nem o WinUI do TaskbarQuota.
 
-A lógica (sessão, pedido, texto das percentagens, posição na barra) está em `CursorMeter.Core` e corre em qualquer sistema. O resumo e o menu são Avalonia e também correm em qualquer sistema. No Windows, o ícone na área de notificação também é Avalonia. No Linux, como o ícone do Avalonia não aceita texto, o ícone é um StatusNotifierItem próprio, em `src/CursorMeter.App/Linux`, e só volta ao do Avalonia se não houver sessão D-Bus. As barras dentro da barra de tarefas são Win32 e só existem no Windows (`src/CursorMeter.App/Windows`). O arranque com a sessão no Linux está em `src/CursorMeter.App/Linux`.
+A lógica (sessão, pedido, texto das percentagens, posição na barra, deteção das ilhas) está em `CursorMeter.Core` e corre em qualquer sistema. A leitura das cores do Start11 está em `src/CursorMeter.App/Windows/Start11Theme.cs`. O resumo e o menu são Avalonia e também correm em qualquer sistema. No Windows, o ícone na área de notificação também é Avalonia. No Linux, como o ícone do Avalonia não aceita texto, o ícone é um StatusNotifierItem próprio, em `src/CursorMeter.App/Linux`, e só volta ao do Avalonia se não houver sessão D-Bus. As barras dentro da barra de tarefas são Win32 e só existem no Windows (`src/CursorMeter.App/Windows`). O arranque com a sessão no Linux está em `src/CursorMeter.App/Linux`.
