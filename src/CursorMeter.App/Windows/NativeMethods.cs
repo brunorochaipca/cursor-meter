@@ -27,6 +27,8 @@ internal static class NativeMethods
     public const uint RdwNoErase = 0x0020;
     public const uint RdwUpdateNow = 0x0100;
     public const uint GaRoot = 2;
+    public const uint GwHwndNext = 2;
+    public const uint GwHwndPrev = 3;
     public const uint WineventOutOfContext = 0x0000;
     public const uint WineventSkipOwnProcess = 0x0002;
     public const uint WmNull = 0x0000;
@@ -89,6 +91,13 @@ internal static class NativeMethods
 
     [DllImport("user32.dll")]
     public static extern bool IsWindowVisible(IntPtr hwnd);
+
+    [DllImport("user32.dll")]
+    public static extern IntPtr GetWindow(IntPtr hwnd, uint command);
+
+    /// <summary>Undocumented but exported. Reading a band needs no privilege, only setting one does.</summary>
+    [DllImport("user32.dll")]
+    public static extern bool GetWindowBand(IntPtr hwnd, out uint band);
 
     [DllImport("user32.dll")]
     public static extern bool EnumWindows(EnumWindowsProc callback, IntPtr lparam);
