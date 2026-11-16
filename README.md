@@ -1,11 +1,12 @@
+<p align="center">
+  <img src="assets/logo.png" alt="Logótipo do CursorMeter" width="128">
+</p>
+
 # CursorMeter
 
 O consumo do Cursor sempre à vista: duas barras, uma por pool de quota, sem abrires o painel Usage.
 
-```
-Cursor Models  ▰▰▱▱▱▱▱▱  15%
-Other Models   ▰▰▰▰▰▰▱▱  75%
-```
+![A ilha do CursorMeter ao lado das ilhas do Start11 v3, no Windows 11](assets/taskbar.png)
 
 Cada barra é a quota desse pool no ciclo atual. Cursor Models corresponde a `autoPercentUsed`. Other Models corresponde a `apiPercentUsed`. São as mesmas duas percentagens do painel Usage.
 
@@ -24,11 +25,10 @@ No **Ubuntu**, é um ícone na área de notificação com as percentagens ao lad
 No Start11 v3, ativa as ilhas da barra de tarefas (Taskbar Islands) e usa o alinhamento **tudo ao centro**: o botão Iniciar e os ícones juntos numa ilha ao centro, e a área de notificação noutra, à direita. O espaço livre à esquerda fica para o CursorMeter, que ocupa o **canto esquerdo** como uma ilha própria e fica sempre fixo ali.
 
 ```
-┌──────────────────┐        ┌─────────────────────────┐        ┌─────────────┐
-│ Cursor Models 15%│        │  ⊞  🗂  📁  🛍  🦊  …    │        │  ^ 📶 🔊 🔋  │
-│ Other Models  75%│        │                         │        │  19:38      │
-└──────────────────┘        └─────────────────────────┘        └─────────────┘
-   CursorMeter                 Start11, ícones                    Notificações
+┌──────────────┐      ┌───────────────────────┐      ┌──────────────┐
+│  CursorMeter │      │  Iniciar e ícones     │      │ Notificações │
+└──────────────┘      └───────────────────────┘      └──────────────┘
+  canto esquerdo           ao centro                    à direita
 ```
 
 A ilha:
@@ -112,3 +112,7 @@ As barras aparecem na barra de tarefas, como descrito em [Windows](#windows).
 - Não é preciso o Windows App SDK nem o WinUI do TaskbarQuota.
 
 A lógica (sessão, pedido, texto das percentagens, posição na barra, deteção das ilhas) está em `CursorMeter.Core` e corre em qualquer sistema. A leitura das cores do Start11 está em `src/CursorMeter.App/Windows/Start11Theme.cs`. O resumo e o menu são Avalonia e também correm em qualquer sistema. No Windows, o ícone na área de notificação também é Avalonia. No Linux, como o ícone do Avalonia não aceita texto, o ícone é um StatusNotifierItem próprio, em `src/CursorMeter.App/Linux`, e só volta ao do Avalonia se não houver sessão D-Bus. As barras dentro da barra de tarefas são Win32 e só existem no Windows (`src/CursorMeter.App/Windows`). O arranque com a sessão no Linux está em `src/CursorMeter.App/Linux`.
+
+## Licença
+
+[MIT](LICENSE). O Avalonia, a interface, tem a sua própria licença MIT.
