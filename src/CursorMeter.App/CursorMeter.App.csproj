@@ -5,6 +5,7 @@
     <RootNamespace>CursorMeter.App</RootNamespace>
     <AssemblyName>CursorMeter</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>..\..\assets\CursorMeter.ico</ApplicationIcon>
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <Product>CursorMeter</Product>
