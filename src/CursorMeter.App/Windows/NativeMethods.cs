@@ -36,6 +36,7 @@ internal static class NativeMethods
     public const uint MfSeparator = 0x0800;
     public const uint TpmRightButton = 0x0002;
     public const uint TpmReturnCmd = 0x0100;
+    public const int DwmwaCloaked = 14;
 
     public delegate void WinEventDelegate(
         IntPtr hook,
@@ -47,6 +48,8 @@ internal static class NativeMethods
         uint eventTime);
 
     public delegate IntPtr WndProc(IntPtr hwnd, uint message, IntPtr wParam, IntPtr lParam);
+
+    public delegate bool EnumWindowsProc(IntPtr hwnd, IntPtr lparam);
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     public static extern IntPtr FindWindow(string? className, string? windowName);
@@ -83,6 +86,15 @@ internal static class NativeMethods
 
     [DllImport("user32.dll")]
     public static extern bool ShowWindow(IntPtr hwnd, int command);
+
+    [DllImport("user32.dll")]
+    public static extern bool IsWindowVisible(IntPtr hwnd);
+
+    [DllImport("user32.dll")]
+    public static extern bool EnumWindows(EnumWindowsProc callback, IntPtr lparam);
+
+    [DllImport("dwmapi.dll")]
+    public static extern int DwmGetWindowAttribute(IntPtr hwnd, int attribute, out int value, int size);
 
     [DllImport("user32.dll")]
     public static extern uint GetDpiForWindow(IntPtr hwnd);

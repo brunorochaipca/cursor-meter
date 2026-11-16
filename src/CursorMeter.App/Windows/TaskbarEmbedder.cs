@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Avalonia;
 using Avalonia.Threading;
 
@@ -8,7 +9,9 @@ namespace CursorMeter.App.Windows;
 /// Windows 10 accepts them as a child of the taskbar. Windows 11 does not present that child:
 /// at 100% the XAML surface covers it and nothing is drawn, while at 125% DPI hosting
 /// happens to scale the same window into view. On Windows 11 the bars are a topmost
-/// window in screen pixels, sized from the taskbar's own DPI.
+/// window in screen pixels, sized from the taskbar's own DPI. Opening Start lifts the
+/// taskbar into a higher band that covers that window, so the bars step just outside
+/// the bar until the menu closes.
 /// </summary>
 internal sealed class TaskbarEmbedder : IDisposable
 {
@@ -24,6 +27,9 @@ internal sealed class TaskbarEmbedder : IDisposable
     private int _delta;
     private int _settleRemaining;
     private bool _placeQueued;
+    private static uint _menuPid;
+    private static bool _menuVisible;
+    private static readonly NativeMethods.EnumWindowsProc FindMenuWindow = OnFindMenuWindow;
 
     public TaskbarEmbedder(WidgetWindow widget)
     {
@@ -65,9 +71,10 @@ internal sealed class TaskbarEmbedder : IDisposable
             return;
         }
 
+        var monitor = MonitorOf(taskbar, taskbarRect);
         var tray = FindTray(taskbar);
         var trayPx = tray != IntPtr.Zero && NativeMethods.GetWindowRect(tray, out var found) ? ToPx(found) : default;
-        var edge = TaskbarLayout.DetectEdge(taskbarPx, MonitorOf(taskbar, taskbarRect));
+        var edge = TaskbarLayout.DetectEdge(taskbarPx, monitor);
         int dpi = DpiOf(taskbar);
         int width = TaskbarLayout.Scale(TaskbarLayout.PreferredWidth, dpi);
         int height = TaskbarLayout.FitThickness(taskbarPx.Height, dpi);
@@ -80,9 +87,15 @@ internal sealed class TaskbarEmbedder : IDisposable
         }
 
         if (overlay)
-            DockOver(screenSlot);
+        {
+            bool lift = MenuCoversTaskbar();
+            var slot = lift ? TaskbarLayout.Beside(taskbarPx, screenSlot, edge, monitor) : screenSlot;
+            DockOver(slot, lift);
+        }
         else
+        {
             Embed(taskbar, taskbarPx, screenSlot, allowReparent);
+        }
     }
 
     public void DragTo(int screenLeft, int screenTop)
@@ -125,7 +138,7 @@ internal sealed class TaskbarEmbedder : IDisposable
             Reparent(taskbar);
         if (NativeMethods.GetParent(_widget.Handle) != taskbar)
         {
-            DockOver(screenSlot);
+            DockOver(screenSlot, lifted: false);
             return;
         }
 
@@ -133,14 +146,88 @@ internal sealed class TaskbarEmbedder : IDisposable
         ShowSlot(local, topmost: false);
     }
 
-    private void DockOver(PxRect screenSlot)
+    private void DockOver(PxRect screenSlot, bool lifted)
     {
+        if (_widget.PinTopmost
+            && !_widget.HeldHidden
+            && _widget.LockedSlot is { } locked
+            && locked.Left == screenSlot.Left
+            && locked.Top == screenSlot.Top
+            && locked.Width == screenSlot.Width
+            && locked.Height == screenSlot.Height)
+        {
+            ArmLiftWatch(lifted);
+            return;
+        }
+
         Embedded = _widget.Embedded = false;
         _widget.PinTopmost = true;
         _widget.HeldHidden = false;
         MakePopup();
         _widget.Topmost = true;
         ShowSlot(screenSlot, topmost: true);
+        ArmLiftWatch(lifted);
+    }
+
+    private void ArmLiftWatch(bool lifted)
+    {
+        if (!lifted)
+            return;
+        _settleRemaining = 8;
+        _settleTimer.Stop();
+        _settleTimer.Start();
+    }
+
+    private static bool MenuCoversTaskbar()
+    {
+        // StartMenuExperienceHost stays running after the menu closes, but its window is hidden.
+        try
+        {
+            var processes = Process.GetProcessesByName("StartMenuExperienceHost");
+            try
+            {
+                foreach (var process in processes)
+                {
+                    if (HasVisibleMenu((uint)process.Id))
+                        return true;
+                }
+            }
+            finally
+            {
+                foreach (var process in processes)
+                    process.Dispose();
+            }
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+        }
+
+        return false;
+    }
+
+    private static bool HasVisibleMenu(uint processId)
+    {
+        _menuPid = processId;
+        _menuVisible = false;
+        NativeMethods.EnumWindows(FindMenuWindow, IntPtr.Zero);
+        return _menuVisible;
+    }
+
+    private static bool OnFindMenuWindow(IntPtr hwnd, IntPtr lparam)
+    {
+        NativeMethods.GetWindowThreadProcessId(hwnd, out var pid);
+        if (pid != _menuPid || !NativeMethods.IsWindowVisible(hwnd))
+            return true;
+        // The Start process keeps a cloaked window after the menu closes.
+        if (NativeMethods.DwmGetWindowAttribute(hwnd, NativeMethods.DwmwaCloaked, out var cloaked, sizeof(int)) == 0
+            && cloaked != 0)
+            return true;
+        if (!NativeMethods.GetWindowRect(hwnd, out var rect))
+            return true;
+        if (rect.Right - rect.Left < 80 || rect.Bottom - rect.Top < 80)
+            return true;
+        _menuVisible = true;
+        return false;
     }
 
     private void ShowSlot(PxRect slot, bool topmost)

@@ -97,4 +97,37 @@ public static class TaskbarLayout
         y = Math.Clamp(y, taskbar.Top + 2, maxY);
         return new PxRect(x, y, x + width, y + height);
     }
+
+    /// <summary>
+    /// Places the same slot just outside the taskbar. Opening Start moves the taskbar
+    /// into a higher window band, which covers a normal topmost window sitting on the bar.
+    /// </summary>
+    public static PxRect Beside(PxRect taskbar, PxRect slot, BarEdge edge, PxRect monitor)
+    {
+        int x = slot.Left;
+        int y = slot.Top;
+        switch (edge)
+        {
+            case BarEdge.Bottom:
+                y = taskbar.Top - slot.Height;
+                break;
+            case BarEdge.Top:
+                y = taskbar.Bottom;
+                break;
+            case BarEdge.Left:
+                x = taskbar.Right;
+                break;
+            case BarEdge.Right:
+                x = taskbar.Left - slot.Width;
+                break;
+        }
+
+        if (!monitor.IsEmpty)
+        {
+            x = Math.Clamp(x, monitor.Left, Math.Max(monitor.Left, monitor.Right - slot.Width));
+            y = Math.Clamp(y, monitor.Top, Math.Max(monitor.Top, monitor.Bottom - slot.Height));
+        }
+
+        return new PxRect(x, y, x + slot.Width, y + slot.Height);
+    }
 }
