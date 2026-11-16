@@ -44,7 +44,8 @@ internal sealed class MeterController : IDisposable
             _statusItem?.Show(_state);
         }
 
-        if (_statusItem is null)
+        // Windows has its own native notification area icon and menu, owned by the taskbar host.
+        if (_statusItem is null && !OperatingSystem.IsWindows())
         {
             _tray = new TrayIcon
             {
@@ -262,9 +263,9 @@ internal sealed class MeterController : IDisposable
         _taskbar?.Show(state);
         _flyout?.ShowState(state);
         _statusItem?.Show(state);
-        // NOTIFYICONDATA caps the Windows tooltip at 63 characters; StatusNotifierItem has no limit.
+        _taskbar?.SetTooltip(state.Detail);
         if (_tray is not null)
-            _tray.ToolTipText = !OperatingSystem.IsWindows() || state.Detail.Length <= 63 ? state.Detail : state.Detail[..63];
+            _tray.ToolTipText = state.Detail;
     }
 
     private void Quit()
