@@ -1,0 +1,57 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="CursorMeter.App.AboutWindow"
+        Title="Acerca do CursorMeter"
+        Width="440"
+        SizeToContent="Height"
+        CanResize="False"
+        WindowStartupLocation="CenterScreen"
+        Background="#181818"
+        FontSize="12">
+  <StackPanel Margin="24,22,24,20" Spacing="14">
+    <StackPanel Orientation="Horizontal" Spacing="14">
+      <Image x:Name="Logo" Width="56" Height="56" />
+      <StackPanel VerticalAlignment="Center">
+        <TextBlock Text="CursorMeter" FontSize="20" FontWeight="SemiBold" Foreground="#ECEAE2" />
+        <TextBlock x:Name="VersionText" Foreground="#B0ACA0" />
+      </StackPanel>
+    </StackPanel>
+
+    <TextBlock Foreground="#ECEAE2"
+               TextWrapping="Wrap"
+               Text="Mostra a quota do Cursor em duas barras: Cursor Models e Other Models." />
+
+    <StackPanel Orientation="Horizontal" Spacing="6">
+      <TextBlock Text="Licença MIT ·" Foreground="#B0ACA0" VerticalAlignment="Center" />
+      <Button x:Name="RepositoryButton"
+              Content="github.com/brunorochaipca/cursor-meter"
+              Padding="0"
+              Background="Transparent"
+              Foreground="#81A1C1"
+              Cursor="Hand" />
+    </StackPanel>
+
+    <Border Height="1" Background="#33FFFFFF" />
+
+    <StackPanel Spacing="6">
+      <TextBlock Text="Registos" FontWeight="SemiBold" Foreground="#ECEAE2" />
+      <SelectableTextBlock x:Name="LogPathText"
+                           Foreground="#B0ACA0"
+                           TextWrapping="Wrap" />
+      <TextBlock Foreground="#B0ACA0"
+                 TextWrapping="Wrap"
+                 Text="Guardam eventos da aplicação (posição das barras, erros), sem a conta nem tokens. Os erros podem incluir o teu nome de utilizador do sistema nos caminhos dos ficheiros." />
+    </StackPanel>
+
+    <TextBlock x:Name="StatusText"
+               MinHeight="32"
+               Foreground="#A3BE8C"
+               TextWrapping="Wrap" />
+
+    <Grid ColumnDefinitions="Auto,Auto,*,Auto">
+      <Button x:Name="FolderButton" Grid.Column="0" Content="Abrir pasta dos registos" />
+      <Button x:Name="SendButton" Grid.Column="1" Margin="8,0,0,0" Content="Enviar registos" />
+      <Button x:Name="CloseButton" Grid.Column="3" Content="Fechar" MinWidth="80" HorizontalContentAlignment="Center" />
+    </Grid>
+  </StackPanel>
+</Window>

@@ -10,16 +10,45 @@ internal static class AppLog
 {
     private const long MaxBytes = 256 * 1024;
     private static readonly object Gate = new();
-    private static readonly string Directory_ = Path.Combine(
+
+    public static string Folder { get; } = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "CursorMeter");
 
-    public static string FilePath { get; } = Path.Combine(Directory_, "cursormeter.log");
+    public static string FilePath { get; } = Path.Combine(Folder, "cursormeter.log");
 
     public static void Info(string message) => Write("INFO ", message);
 
     public static void Error(string message, Exception? exception = null)
         => Write("ERROR", exception is null ? message : $"{message}{Environment.NewLine}{exception}");
+
+    /// <summary>The last <paramref name="lines"/> lines of the log, empty when there is none.</summary>
+    public static string Tail(int lines)
+    {
+        try
+        {
+            lock (Gate)
+            {
+                if (!File.Exists(FilePath))
+                    return "";
+                using var stream = new FileStream(FilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                using var reader = new StreamReader(stream, Encoding.UTF8);
+                var last = new Queue<string>();
+                while (reader.ReadLine() is { } line)
+                {
+                    if (last.Count == lines)
+                        last.Dequeue();
+                    last.Enqueue(line);
+                }
+
+                return string.Join(Environment.NewLine, last);
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return "";
+        }
+    }
 
     /// <summary>Records errors that would otherwise vanish, or end the process without a trace.</summary>
     public static void HookUnhandledErrors()
@@ -36,7 +65,7 @@ internal static class AppLog
         {
             lock (Gate)
             {
-                System.IO.Directory.CreateDirectory(Directory_);
+                Directory.CreateDirectory(Folder);
                 var info = new FileInfo(FilePath);
                 if (info.Exists && info.Length > MaxBytes)
                     File.Move(FilePath, FilePath + ".1", overwrite: true);

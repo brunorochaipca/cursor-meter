@@ -13,7 +13,7 @@ public sealed partial class App : Application
     public override void OnFrameworkInitializationCompleted()
     {
         AppLog.HookUnhandledErrors();
-        AppLog.Info($"Start {typeof(App).Assembly.GetName().Version}, {Environment.OSVersion}, {System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription}");
+        AppLog.Info($"Start {AppInfo.Version}, {AppInfo.Platform}");
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             _controller = new MeterController(desktop);

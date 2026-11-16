@@ -28,6 +28,7 @@ internal sealed class MeterController : IDisposable
     private readonly TaskbarHost? _taskbar;
     private MeterState _state = MeterState.Loading;
     private FlyoutWindow? _flyout;
+    private AboutWindow? _about;
     private DateTime _flyoutClosedAt;
     private bool _refreshing;
     private bool _disposed;
@@ -75,6 +76,7 @@ internal sealed class MeterController : IDisposable
         _disposed = true;
         _usageTimer.Stop();
         _flyout?.Close();
+        _about?.Close();
         _taskbar?.Dispose();
         _tray?.Dispose();
         _statusItem?.Dispose();
@@ -94,6 +96,7 @@ internal sealed class MeterController : IDisposable
         if (OperatingSystem.IsLinux())
             menu.Add(AutostartEntry.MenuEntry());
         menu.Add(null);
+        menu.Add(new("Acerca de", ShowAbout));
         menu.Add(new("Sair", Quit));
         return menu;
     }
@@ -134,6 +137,23 @@ internal sealed class MeterController : IDisposable
         SyncToggles();
         menu.Opening += (_, _) => SyncToggles();
         return menu;
+    }
+
+    private void ShowAbout()
+    {
+        if (_disposed)
+            return;
+        if (_about is not null)
+        {
+            _about.Activate();
+            return;
+        }
+
+        var about = new AboutWindow();
+        about.Closed += (_, _) => _about = null;
+        _about = about;
+        about.Show();
+        about.Activate();
     }
 
     private void ToggleFlyout()
