@@ -51,7 +51,7 @@ internal sealed partial class AboutWindow : Window
         {
             AppLog.Error("Could not copy the log to the clipboard", ex);
             OpenIssue();
-            Status("Não consegui copiar o registo. Abre a pasta dos registos e anexa o ficheiro à issue.", Warning);
+            Status("Não foi possível copiar o registo. Abra a pasta dos registos e anexe o ficheiro à issue.", Warning);
             return;
         }
 
@@ -59,7 +59,7 @@ internal sealed partial class AboutWindow : Window
         var confirm = new ConfirmWindow(
             "Enviar registos",
             "Os registos estão na área de transferência.",
-            "Vou abrir o GitHub para criares uma issue. Se não tiveres sessão iniciada, inicia-a primeiro. Depois cola o registo (Ctrl+V) na descrição e carrega em Create.",
+            "Será aberto o GitHub para reportar alguma anomalia que tenha encontrado. Após iniciar a sessão cole o registo (Ctrl+V) na descrição e carregue em Create.",
             "Abrir o GitHub",
             "Cancelar");
         if (!await confirm.ShowDialog<bool>(this))
