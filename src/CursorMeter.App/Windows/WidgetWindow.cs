@@ -6,7 +6,8 @@ using Avalonia.Input;
 namespace CursorMeter.App.Windows;
 
 /// <summary>
-/// The window that holds the bars. <see cref="TaskbarEmbedder"/> turns it into a child of the taskbar.
+/// The window that holds the bars. On Windows 10 <see cref="TaskbarEmbedder"/> parents it to the taskbar.
+/// On Windows 11 it stays a top-level window drawn over the taskbar.
 /// </summary>
 internal sealed class WidgetWindow : Window
 {
@@ -35,7 +36,10 @@ internal sealed class WidgetWindow : Window
         Win32Properties.AddWindowStylesCallback(this, KeepStyles);
         Win32Properties.AddWndProcHookCallback(this, OnWindowMessage);
         int exStyle = NativeMethods.GetWindowLong(Handle, NativeMethods.GwlExStyle);
-        NativeMethods.SetWindowLong(Handle, NativeMethods.GwlExStyle, exStyle | NativeMethods.WsExToolWindow);
+        NativeMethods.SetWindowLong(
+            Handle,
+            NativeMethods.GwlExStyle,
+            exStyle | NativeMethods.WsExToolWindow | NativeMethods.WsExNoActivate);
     }
 
     public event EventHandler? Clicked;
@@ -48,6 +52,12 @@ internal sealed class WidgetWindow : Window
 
     /// <summary>Set while the window is a child of the taskbar, so Avalonia never restores its popup style.</summary>
     public bool Embedded { get; set; }
+
+    /// <summary>Set while the window is drawn over the taskbar, so Avalonia cannot drop it behind the shell.</summary>
+    public bool PinTopmost { get; set; }
+
+    /// <summary>Set while the taskbar is auto-hidden, so a later move does not show the bars on the desktop.</summary>
+    public bool HeldHidden { get; set; }
 
     /// <summary>The slot in the taskbar; every move or resize that does not come from a drag is pinned to it.</summary>
     public PxRect? LockedSlot { get; set; }
@@ -122,7 +132,11 @@ internal sealed class WidgetWindow : Window
 
     private (uint Style, uint ExStyle) KeepStyles(uint style, uint exStyle)
     {
-        exStyle |= NativeMethods.WsExToolWindow;
+        exStyle |= (uint)(NativeMethods.WsExToolWindow | NativeMethods.WsExNoActivate);
+        if (PinTopmost)
+            exStyle |= (uint)NativeMethods.WsExTopMost;
+        else
+            exStyle &= unchecked((uint)~NativeMethods.WsExTopMost);
         if (Embedded)
         {
             style &= unchecked(~(uint)(NativeMethods.WsPopup | NativeMethods.WsClipSiblings));
@@ -134,14 +148,31 @@ internal sealed class WidgetWindow : Window
 
     private IntPtr OnWindowMessage(IntPtr hwnd, uint message, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
-        if (message == NativeMethods.WmWindowPosChanging && !_dragging && LockedSlot is { IsEmpty: false } slot)
+        if (message != NativeMethods.WmWindowPosChanging || _dragging)
+            return IntPtr.Zero;
+
+        var pos = Marshal.PtrToStructure<NativeMethods.WindowPos>(lParam);
+        if (HeldHidden)
         {
-            var pos = Marshal.PtrToStructure<NativeMethods.WindowPos>(lParam);
+            pos.Flags |= NativeMethods.SwpHideWindow;
+            pos.Flags &= ~NativeMethods.SwpShowWindow;
+            Marshal.StructureToPtr(pos, lParam, false);
+            return IntPtr.Zero;
+        }
+
+        if (LockedSlot is { IsEmpty: false } slot)
+        {
             pos.X = slot.Left;
             pos.Y = slot.Top;
             pos.Cx = slot.Width;
             pos.Cy = slot.Height;
             pos.Flags &= ~(NativeMethods.SwpNoSize | NativeMethods.SwpNoMove);
+            if (PinTopmost)
+            {
+                pos.HwndInsertAfter = NativeMethods.HwndTopMost;
+                pos.Flags &= ~NativeMethods.SwpNoZOrder;
+            }
+
             Marshal.StructureToPtr(pos, lParam, false);
         }
 

@@ -4,13 +4,17 @@ using Avalonia.Threading;
 namespace CursorMeter.App.Windows;
 
 /// <summary>
-/// Reparents the widget into the primary taskbar, to the left of the tray.
-/// If Explorer will not take the window, it stays docked on top of the taskbar.
+/// Keeps the bars on the primary taskbar, just left of the tray.
+/// Windows 10 accepts them as a child of the taskbar. Windows 11 does not present that child:
+/// at 100% the XAML surface covers it and nothing is drawn, while at 125% DPI hosting
+/// happens to scale the same window into view. On Windows 11 the bars are a topmost
+/// window in screen pixels, sized from the taskbar's own DPI.
 /// </summary>
 internal sealed class TaskbarEmbedder : IDisposable
 {
     private const uint EventObjectCreate = 0x8000;
     private const uint EventObjectLocationChange = 0x800B;
+    private const string XamlBridgeClass = "Windows.UI.Composition.DesktopWindowContentBridge";
 
     private readonly WidgetWindow _widget;
     private readonly NativeMethods.WinEventDelegate _onTaskbarEvent;
@@ -51,39 +55,34 @@ internal sealed class TaskbarEmbedder : IDisposable
             return;
         }
 
-        var tray = FindTray(taskbar);
-        var trayRect = tray != IntPtr.Zero && NativeMethods.GetWindowRect(tray, out var found)
-            ? found
-            : default;
-
-        var taskbarClient = RelativeTo(taskbarRect, taskbarRect);
-        var trayClient = tray == IntPtr.Zero ? default : RelativeTo(taskbarRect, trayRect);
-        var edge = TaskbarLayout.DetectEdge(ToPx(taskbarRect), MonitorOf(taskbar, taskbarRect));
-        var slot = TaskbarLayout.Place(taskbarClient, trayClient, edge, _delta, PreferredWidth, FitHeight(taskbarClient.Height));
-
-        if (allowReparent || NativeMethods.GetParent(_widget.Handle) != taskbar)
-            Reparent(taskbar);
-        if (NativeMethods.GetParent(_widget.Handle) != taskbar)
+        var taskbarPx = ToPx(taskbarRect);
+        bool overlay = DrawOverTaskbar(taskbar);
+        if (TaskbarLayout.IsCollapsed(taskbarPx))
         {
-            DockFallback();
+            // A child is clipped by the shrunk taskbar. An overlay would sit on the desktop edge.
+            if (overlay)
+                HoldHidden();
             return;
         }
 
-        KeepAboveSiblings();
-        _widget.LockedSlot = slot;
-        NativeMethods.SetWindowPos(
-            _widget.Handle,
-            IntPtr.Zero,
-            slot.Left,
-            slot.Top,
-            slot.Width,
-            slot.Height,
-            NativeMethods.SwpNoActivate | NativeMethods.SwpShowWindow);
-        NativeMethods.RedrawWindow(
-            _widget.Handle,
-            IntPtr.Zero,
-            IntPtr.Zero,
-            NativeMethods.RdwInvalidate | NativeMethods.RdwNoErase | NativeMethods.RdwUpdateNow);
+        var tray = FindTray(taskbar);
+        var trayPx = tray != IntPtr.Zero && NativeMethods.GetWindowRect(tray, out var found) ? ToPx(found) : default;
+        var edge = TaskbarLayout.DetectEdge(taskbarPx, MonitorOf(taskbar, taskbarRect));
+        int dpi = DpiOf(taskbar);
+        int width = TaskbarLayout.Scale(TaskbarLayout.PreferredWidth, dpi);
+        int height = TaskbarLayout.FitThickness(taskbarPx.Height, dpi);
+        var screenSlot = TaskbarLayout.Place(taskbarPx, trayPx, edge, _delta, width, height);
+        if (screenSlot.IsEmpty)
+        {
+            if (overlay)
+                HoldHidden();
+            return;
+        }
+
+        if (overlay)
+            DockOver(screenSlot);
+        else
+            Embed(taskbar, taskbarPx, screenSlot, allowReparent);
     }
 
     public void DragTo(int screenLeft, int screenTop)
@@ -92,16 +91,16 @@ internal sealed class TaskbarEmbedder : IDisposable
         if (taskbar == IntPtr.Zero || !NativeMethods.GetWindowRect(taskbar, out var taskbarRect))
             return;
 
+        var taskbarPx = ToPx(taskbarRect);
         var tray = FindTray(taskbar);
-        var trayRect = tray != IntPtr.Zero && NativeMethods.GetWindowRect(tray, out var found) ? found : default;
-        var taskbarClient = RelativeTo(taskbarRect, taskbarRect);
-        var trayClient = tray == IntPtr.Zero ? default : RelativeTo(taskbarRect, trayRect);
-        var edge = TaskbarLayout.DetectEdge(ToPx(taskbarRect), MonitorOf(taskbar, taskbarRect));
-        int height = FitHeight(taskbarClient.Height);
-        var natural = TaskbarLayout.Place(taskbarClient, trayClient, edge, 0, PreferredWidth, height);
-        int x = screenLeft - taskbarRect.Left;
-        int y = screenTop - taskbarRect.Top;
-        _delta = edge is BarEdge.Left or BarEdge.Right ? y - natural.Top : x - natural.Left;
+        var trayPx = tray != IntPtr.Zero && NativeMethods.GetWindowRect(tray, out var found) ? ToPx(found) : default;
+        var edge = TaskbarLayout.DetectEdge(taskbarPx, MonitorOf(taskbar, taskbarRect));
+        int dpi = DpiOf(taskbar);
+        int height = TaskbarLayout.FitThickness(taskbarPx.Height, dpi);
+        var natural = TaskbarLayout.Place(taskbarPx, trayPx, edge, 0, TaskbarLayout.Scale(TaskbarLayout.PreferredWidth, dpi), height);
+        _delta = edge is BarEdge.Left or BarEdge.Right
+            ? screenTop - natural.Top
+            : screenLeft - natural.Left;
         WriteDelta(_delta);
         Place();
     }
@@ -112,26 +111,116 @@ internal sealed class TaskbarEmbedder : IDisposable
         Unhook();
     }
 
-    private int PreferredWidth => _widget.ToPixels(TaskbarLayout.PreferredWidth);
+    private void Embed(IntPtr taskbar, PxRect taskbarPx, PxRect screenSlot, bool allowReparent)
+    {
+        var local = new PxRect(
+            screenSlot.Left - taskbarPx.Left,
+            screenSlot.Top - taskbarPx.Top,
+            screenSlot.Right - taskbarPx.Left,
+            screenSlot.Bottom - taskbarPx.Top);
+
+        _widget.PinTopmost = false;
+        _widget.HeldHidden = false;
+        if (allowReparent || NativeMethods.GetParent(_widget.Handle) != taskbar)
+            Reparent(taskbar);
+        if (NativeMethods.GetParent(_widget.Handle) != taskbar)
+        {
+            DockOver(screenSlot);
+            return;
+        }
+
+        KeepAboveSiblings();
+        ShowSlot(local, topmost: false);
+    }
+
+    private void DockOver(PxRect screenSlot)
+    {
+        Embedded = _widget.Embedded = false;
+        _widget.PinTopmost = true;
+        _widget.HeldHidden = false;
+        MakePopup();
+        _widget.Topmost = true;
+        ShowSlot(screenSlot, topmost: true);
+    }
+
+    private void ShowSlot(PxRect slot, bool topmost)
+    {
+        _widget.LockedSlot = slot;
+        NativeMethods.SetWindowPos(
+            _widget.Handle,
+            topmost ? NativeMethods.HwndTopMost : IntPtr.Zero,
+            slot.Left,
+            slot.Top,
+            slot.Width,
+            slot.Height,
+            NativeMethods.SwpNoActivate | NativeMethods.SwpShowWindow | NativeMethods.SwpFrameChanged);
+        NativeMethods.RedrawWindow(
+            _widget.Handle,
+            IntPtr.Zero,
+            IntPtr.Zero,
+            NativeMethods.RdwInvalidate | NativeMethods.RdwNoErase | NativeMethods.RdwUpdateNow);
+    }
+
+    private void MakePopup()
+    {
+        var hwnd = _widget.Handle;
+        int style = NativeMethods.GetWindowLong(hwnd, NativeMethods.GwlStyle);
+        if ((style & NativeMethods.WsChild) != 0 || NativeMethods.GetParent(hwnd) != IntPtr.Zero)
+        {
+            style &= ~NativeMethods.WsChild;
+            style |= NativeMethods.WsPopup | NativeMethods.WsVisible;
+            NativeMethods.SetWindowLong(hwnd, NativeMethods.GwlStyle, style);
+            NativeMethods.SetParent(hwnd, IntPtr.Zero);
+        }
+
+        int exStyle = NativeMethods.GetWindowLong(hwnd, NativeMethods.GwlExStyle);
+        int wanted = exStyle | NativeMethods.WsExToolWindow | NativeMethods.WsExNoActivate | NativeMethods.WsExTopMost;
+        if (wanted != exStyle)
+            NativeMethods.SetWindowLong(hwnd, NativeMethods.GwlExStyle, wanted);
+    }
 
     private void Reparent(IntPtr taskbar)
     {
-        if (NativeMethods.GetParent(_widget.Handle) == taskbar)
+        var hwnd = _widget.Handle;
+        int exStyle = NativeMethods.GetWindowLong(hwnd, NativeMethods.GwlExStyle);
+        exStyle &= ~NativeMethods.WsExTopMost;
+        exStyle |= NativeMethods.WsExToolWindow | NativeMethods.WsExNoActivate;
+        NativeMethods.SetWindowLong(hwnd, NativeMethods.GwlExStyle, exStyle);
+
+        if (NativeMethods.GetParent(hwnd) == taskbar)
         {
             Embedded = _widget.Embedded = true;
             KeepAboveSiblings();
             return;
         }
 
-        int style = NativeMethods.GetWindowLong(_widget.Handle, NativeMethods.GwlStyle);
+        int style = NativeMethods.GetWindowLong(hwnd, NativeMethods.GwlStyle);
         style &= ~NativeMethods.WsPopup;
         style &= ~NativeMethods.WsClipSiblings;
         style |= NativeMethods.WsChild | NativeMethods.WsVisible;
-        NativeMethods.SetWindowLong(_widget.Handle, NativeMethods.GwlStyle, style);
-        NativeMethods.SetParent(_widget.Handle, taskbar);
-        Embedded = _widget.Embedded = NativeMethods.GetParent(_widget.Handle) == taskbar;
+        NativeMethods.SetWindowLong(hwnd, NativeMethods.GwlStyle, style);
+        NativeMethods.SetParent(hwnd, taskbar);
+        Embedded = _widget.Embedded = NativeMethods.GetParent(hwnd) == taskbar;
         if (Embedded)
             _widget.Topmost = false;
+    }
+
+    private static bool DrawOverTaskbar(IntPtr taskbar)
+    {
+        // 22000 is Windows 11. The XAML taskbar presents its own surface and not a foreign child.
+        if (OperatingSystem.IsWindowsVersionAtLeast(10, 0, 22000))
+            return true;
+        if (NativeMethods.FindWindowEx(taskbar, IntPtr.Zero, XamlBridgeClass, null) != IntPtr.Zero)
+            return true;
+
+        IntPtr child = IntPtr.Zero;
+        while ((child = NativeMethods.FindWindowEx(taskbar, child, null, null)) != IntPtr.Zero)
+        {
+            if (NativeMethods.FindWindowEx(child, IntPtr.Zero, XamlBridgeClass, null) != IntPtr.Zero)
+                return true;
+        }
+
+        return false;
     }
 
     private void OnSettleTick()
@@ -218,38 +307,50 @@ internal sealed class TaskbarEmbedder : IDisposable
         NativeMethods.SetWindowLong(_widget.Handle, NativeMethods.GwlStyle, style & ~NativeMethods.WsClipSiblings);
     }
 
+    private void HoldHidden()
+    {
+        Embedded = _widget.Embedded = false;
+        _widget.PinTopmost = false;
+        _widget.HeldHidden = true;
+        _widget.LockedSlot = null;
+        _widget.Topmost = false;
+        NativeMethods.ShowWindow(_widget.Handle, NativeMethods.SwHide);
+    }
+
     private void DockFallback()
     {
         Embedded = _widget.Embedded = false;
-        _widget.LockedSlot = null;
+        _widget.PinTopmost = true;
+        _widget.HeldHidden = false;
         if (!_widget.IsAlive)
             return;
 
-        int style = NativeMethods.GetWindowLong(_widget.Handle, NativeMethods.GwlStyle);
-        style &= ~NativeMethods.WsChild;
-        style |= NativeMethods.WsPopup | NativeMethods.WsVisible;
-        NativeMethods.SetWindowLong(_widget.Handle, NativeMethods.GwlStyle, style);
-        NativeMethods.SetParent(_widget.Handle, IntPtr.Zero);
-
+        MakePopup();
         var area = _widget.Screens.Primary?.WorkingArea ?? new PixelRect(0, 0, 1280, 720);
-        int width = PreferredWidth;
-        int height = _widget.ToPixels(TaskbarLayout.PreferredHeight);
+        int dpi = DpiOf(_widget.Handle);
+        int width = TaskbarLayout.Scale(TaskbarLayout.PreferredWidth, dpi);
+        int height = TaskbarLayout.Scale(TaskbarLayout.PreferredHeight, dpi);
+        int left = area.Right - width - TaskbarLayout.Scale(12, dpi);
+        int top = area.Bottom - height - TaskbarLayout.Scale(8, dpi);
         _widget.Topmost = true;
-        NativeMethods.SetWindowPos(
-            _widget.Handle,
-            IntPtr.Zero,
-            area.Right - width - _widget.ToPixels(12),
-            area.Bottom - height - _widget.ToPixels(8),
-            width,
-            height,
-            NativeMethods.SwpNoActivate | NativeMethods.SwpNoZOrder);
+        ShowSlot(new PxRect(left, top, left + width, top + height), topmost: true);
     }
 
-    private int FitHeight(int taskbarHeight)
+    private int DpiOf(IntPtr window)
     {
-        if (taskbarHeight <= 0)
-            return _widget.ToPixels(TaskbarLayout.PreferredHeight);
-        return Math.Clamp(taskbarHeight - _widget.ToPixels(4), _widget.ToPixels(30), _widget.ToPixels(48));
+        try
+        {
+            uint dpi = window == IntPtr.Zero ? 0 : NativeMethods.GetDpiForWindow(window);
+            if (dpi >= 96)
+                return (int)dpi;
+        }
+        catch (EntryPointNotFoundException)
+        {
+            // GetDpiForWindow arrived in Windows 10 1607. Fall back to the window scale.
+        }
+
+        var scaled = (int)Math.Round(96 * _widget.RenderScaling);
+        return scaled >= 96 ? scaled : 96;
     }
 
     private static IntPtr FindTray(IntPtr taskbar)
@@ -268,13 +369,6 @@ internal sealed class TaskbarEmbedder : IDisposable
 
         return IntPtr.Zero;
     }
-
-    private static PxRect RelativeTo(NativeMethods.Rect origin, NativeMethods.Rect screen)
-        => new(
-            screen.Left - origin.Left,
-            screen.Top - origin.Top,
-            screen.Right - origin.Left,
-            screen.Bottom - origin.Top);
 
     private static PxRect ToPx(NativeMethods.Rect rect) => new(rect.Left, rect.Top, rect.Right, rect.Bottom);
 

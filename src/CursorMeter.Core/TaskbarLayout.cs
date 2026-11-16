@@ -18,6 +18,33 @@ public static class TaskbarLayout
     public const int PreferredHeight = 40;
     public const int Gap = 6;
 
+    /// <summary>An auto-hidden taskbar shrinks to a sliver of about two pixels.</summary>
+    public const int CollapsedThickness = 16;
+
+    public static int Scale(int dip, int dpi)
+    {
+        if (dpi <= 0)
+            dpi = 96;
+        return (int)Math.Round(dip * (dpi / 96.0));
+    }
+
+    /// <summary>
+    /// Height of the bars for a taskbar of <paramref name="taskbarThickness"/> pixels.
+    /// Stays inside the bar at 100% (48px), 125% (60px) and 150% (72px).
+    /// </summary>
+    public static int FitThickness(int taskbarThickness, int dpi)
+    {
+        if (taskbarThickness <= 0)
+            return Scale(PreferredHeight, dpi);
+        return Math.Clamp(taskbarThickness - Scale(4, dpi), Scale(30, dpi), Scale(48, dpi));
+    }
+
+    public static bool IsCollapsed(PxRect taskbar)
+    {
+        int thickness = Math.Min(Math.Abs(taskbar.Width), Math.Abs(taskbar.Height));
+        return thickness < CollapsedThickness;
+    }
+
     public static BarEdge DetectEdge(PxRect taskbar, PxRect screen)
     {
         bool horizontal = taskbar.Width >= taskbar.Height;
