@@ -1,0 +1,21 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="CursorMeter.App.ConfirmWindow"
+        Width="400"
+        SizeToContent="Height"
+        CanResize="False"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        Background="#181818"
+        FontSize="12">
+  <StackPanel Margin="24,22,24,20" Spacing="16">
+    <StackPanel Spacing="8">
+      <TextBlock x:Name="HeadingText" FontSize="14" FontWeight="SemiBold" Foreground="#ECEAE2" TextWrapping="Wrap" />
+      <TextBlock x:Name="MessageText" Foreground="#B0ACA0" TextWrapping="Wrap" />
+    </StackPanel>
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+      <Button x:Name="CancelButton" MinWidth="88" HorizontalContentAlignment="Center" />
+      <Button x:Name="AcceptButton" MinWidth="120" HorizontalContentAlignment="Center" Classes="accent" />
+    </StackPanel>
+  </StackPanel>
+</Window>

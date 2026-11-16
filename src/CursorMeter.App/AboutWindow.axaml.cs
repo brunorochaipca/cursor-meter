@@ -55,8 +55,21 @@ internal sealed partial class AboutWindow : Window
             return;
         }
 
+        // The browser takes the focus as soon as it opens, so say first that the log is on the clipboard.
+        var confirm = new ConfirmWindow(
+            "Enviar registos",
+            "Os registos estão na área de transferência.",
+            "Vou abrir o GitHub para criares uma issue. Se não tiveres sessão iniciada, inicia-a primeiro. Depois cola o registo (Ctrl+V) na descrição e carrega em Create.",
+            "Abrir o GitHub",
+            "Cancelar");
+        if (!await confirm.ShowDialog<bool>(this))
+        {
+            Status($"As últimas {ReportLines} linhas do registo continuam na área de transferência.", Good);
+            return;
+        }
+
         if (OpenIssue())
-            Status($"Copiei as últimas {ReportLines} linhas do registo. Cola-as na issue que se abriu (Ctrl+V).", Good);
+            Status($"As últimas {ReportLines} linhas do registo estão na área de transferência. Cola-as na issue (Ctrl+V).", Good);
         else
             Status($"Copiei o registo, mas não consegui abrir o navegador. Cola-o numa issue em {AppInfo.Repository}/issues.", Warning);
     }
