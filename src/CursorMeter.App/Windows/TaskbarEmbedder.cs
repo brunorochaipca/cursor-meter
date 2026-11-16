@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Threading;
 
@@ -13,7 +14,8 @@ namespace CursorMeter.App.Windows;
 /// taskbar into a higher band that covers that window, so the bars step just outside
 /// the bar until the menu closes. A taskbar button click, or a taskbar replacement such as
 /// Start11, can also raise the taskbar above the bars without moving it, so the order is
-/// checked on every placement and on a short timer.
+/// checked on every placement and on a short timer. When Start11 cuts the taskbar into
+/// islands, the bars become a fixed island of their own on the left, where nothing covers them.
 /// </summary>
 internal sealed class TaskbarEmbedder : IDisposable
 {
@@ -31,6 +33,7 @@ internal sealed class TaskbarEmbedder : IDisposable
     private int _settleRemaining;
     private bool _placeQueued;
     private bool _lifted;
+    private bool _onIsland;
     private static uint _menuPid;
     private static bool _menuVisible;
     private static readonly NativeMethods.EnumWindowsProc FindMenuWindow = OnFindMenuWindow;
@@ -85,6 +88,15 @@ internal sealed class TaskbarEmbedder : IDisposable
         var edge = TaskbarLayout.DetectEdge(taskbarPx, monitor);
         int dpi = DpiOf(taskbar);
         int width = TaskbarLayout.Scale(TaskbarLayout.PreferredWidth, dpi);
+        var island = overlay ? FindIsland(taskbar, taskbarPx, edge, dpi) : null;
+        _onIsland = island is not null;
+        _widget.ShowIsland(island?.Look);
+        if (island is { } onIsland)
+        {
+            DockOver(onIsland.Slot, lifted: false);
+            return;
+        }
+
         int height = TaskbarLayout.FitThickness(taskbarPx.Height, dpi);
         var screenSlot = TaskbarLayout.Place(taskbarPx, trayPx, edge, _delta, width, height);
         if (screenSlot.IsEmpty)
@@ -108,6 +120,9 @@ internal sealed class TaskbarEmbedder : IDisposable
 
     public void DragTo(int screenLeft, int screenTop)
     {
+        if (_onIsland)
+            return;
+
         var taskbar = NativeMethods.FindWindow("Shell_TrayWnd", null);
         if (taskbar == IntPtr.Zero || !NativeMethods.GetWindowRect(taskbar, out var taskbarRect))
             return;
@@ -204,7 +219,8 @@ internal sealed class TaskbarEmbedder : IDisposable
 
         // Task View moves the taskbar into a band above the bars and, with Start11, leaves it
         // there after it closes. No topmost window can sit over a taskbar in a higher band.
-        if (TaskbarInOtherBand(taskbar))
+        // An island sits outside the taskbar's region, so the band does not hide it.
+        if (!_onIsland && TaskbarInOtherBand(taskbar))
         {
             Place();
             return;
@@ -507,6 +523,8 @@ internal sealed class TaskbarEmbedder : IDisposable
 
     private void DockFallback()
     {
+        _onIsland = false;
+        _widget.ShowIsland(null);
         Embedded = _widget.Embedded = false;
         _widget.PinTopmost = true;
         _widget.HeldHidden = false;
@@ -559,6 +577,70 @@ internal sealed class TaskbarEmbedder : IDisposable
     }
 
     private static PxRect ToPx(NativeMethods.Rect rect) => new(rect.Left, rect.Top, rect.Right, rect.Bottom);
+
+    private static (PxRect Slot, IslandLook Look)? FindIsland(IntPtr taskbar, PxRect taskbarPx, BarEdge edge, int dpi)
+    {
+        if (edge is not (BarEdge.Bottom or BarEdge.Top))
+            return null;
+
+        var islands = TaskbarIslands.FromRegion(RegionRects(taskbar));
+        var slot = TaskbarIslands.LeftSlot(
+            taskbarPx,
+            islands,
+            TaskbarLayout.Scale(TaskbarLayout.PreferredWidth, dpi),
+            TaskbarLayout.Scale(160, dpi));
+        if (slot.IsEmpty)
+            return null;
+
+        var look = Start11Theme.Look(TaskbarIslands.CornerRadius(islands[0].Corner)).At(dpi);
+        int margin = look.Margin;
+        return (new PxRect(slot.Left - margin, slot.Top - margin, slot.Right + margin, slot.Bottom + margin), look);
+    }
+
+    /// <summary>The rectangles of a window region, relative to the window. Empty when it has none.</summary>
+    private static List<PxRect> RegionRects(IntPtr window)
+    {
+        var rects = new List<PxRect>();
+        var region = NativeMethods.CreateRectRgn(0, 0, 0, 0);
+        if (region == IntPtr.Zero)
+            return rects;
+        try
+        {
+            if (NativeMethods.GetWindowRgn(window, region) < NativeMethods.SimpleRegion)
+                return rects;
+            uint size = NativeMethods.GetRegionData(region, 0, IntPtr.Zero);
+            if (size < 32)
+                return rects;
+
+            // RGNDATAHEADER is 32 bytes, with the rectangle count at offset 8; RECTs follow.
+            var data = Marshal.AllocHGlobal((int)size);
+            try
+            {
+                if (NativeMethods.GetRegionData(region, size, data) == 0)
+                    return rects;
+                int count = Marshal.ReadInt32(data, 8);
+                for (int i = 0; i < count && 32 + ((i + 1) * 16) <= size; i++)
+                {
+                    int offset = 32 + (i * 16);
+                    rects.Add(new PxRect(
+                        Marshal.ReadInt32(data, offset),
+                        Marshal.ReadInt32(data, offset + 4),
+                        Marshal.ReadInt32(data, offset + 8),
+                        Marshal.ReadInt32(data, offset + 12)));
+                }
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(data);
+            }
+        }
+        finally
+        {
+            NativeMethods.DeleteObject(region);
+        }
+
+        return rects;
+    }
 
     private static PxRect MonitorOf(IntPtr taskbar, NativeMethods.Rect taskbarRect)
     {

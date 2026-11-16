@@ -39,6 +39,7 @@ internal static class NativeMethods
     public const uint TpmRightButton = 0x0002;
     public const uint TpmReturnCmd = 0x0100;
     public const int DwmwaCloaked = 14;
+    public const int SimpleRegion = 2;
 
     public delegate void WinEventDelegate(
         IntPtr hook,
@@ -183,6 +184,18 @@ internal static class NativeMethods
 
     [DllImport("user32.dll")]
     public static extern bool DestroyMenu(IntPtr menu);
+
+    [DllImport("user32.dll")]
+    public static extern int GetWindowRgn(IntPtr hwnd, IntPtr region);
+
+    [DllImport("gdi32.dll")]
+    public static extern IntPtr CreateRectRgn(int left, int top, int right, int bottom);
+
+    [DllImport("gdi32.dll")]
+    public static extern uint GetRegionData(IntPtr region, uint size, IntPtr data);
+
+    [DllImport("gdi32.dll")]
+    public static extern bool DeleteObject(IntPtr gdiObject);
 
     public const uint MonitorDefaultToNearest = 2;
 
