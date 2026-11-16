@@ -20,7 +20,11 @@ internal sealed class TaskbarHost : IDisposable
     public TaskbarHost(IReadOnlyList<MenuEntry?> menu)
     {
         _menu = menu;
-        _shell.TaskbarCreated += (_, _) => KeepOnTaskbar();
+        _shell.TaskbarCreated += (_, _) =>
+        {
+            AppLog.Info("Explorer recreated the taskbar (TaskbarCreated)");
+            KeepOnTaskbar();
+        };
         _placeTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
         _placeTimer.Tick += (_, _) => KeepOnTaskbar();
         CreateWidget();
@@ -71,6 +75,7 @@ internal sealed class TaskbarHost : IDisposable
         embedder.Dispose();
         if (_widget != widget)
             return;
+        AppLog.Info("The widget window closed");
         _widget = null;
         _embedder = null;
         if (!_disposed)
@@ -83,6 +88,7 @@ internal sealed class TaskbarHost : IDisposable
             return;
         if (_widget is not { IsAlive: true } || _embedder is null)
         {
+            AppLog.Info("The bars were gone, building a new widget");
             _embedder?.Dispose();
             CreateWidget();
             return;

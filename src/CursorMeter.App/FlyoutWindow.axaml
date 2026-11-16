@@ -9,9 +9,14 @@
         ShowInTaskbar="False"
         Topmost="True"
         WindowStartupLocation="Manual"
-        Background="#181818"
+        Background="Transparent"
         FontSize="12">
-  <Border BorderBrush="#464646" BorderThickness="1" Padding="16,14,16,14">
+  <Border x:Name="Card"
+          Background="#181818"
+          BorderBrush="#33FFFFFF"
+          BorderThickness="1"
+          CornerRadius="8"
+          Padding="16,14,16,14">
     <StackPanel>
       <TextBlock x:Name="DetailText"
                  MinHeight="40"

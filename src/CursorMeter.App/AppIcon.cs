@@ -24,11 +24,11 @@ internal static class AppIcon
         return new WindowIcon(stream);
     }
 
-    public static RenderTargetBitmap Render()
+    public static RenderTargetBitmap Render(int size = Size)
     {
-        var bitmap = new RenderTargetBitmap(new PixelSize(Size, Size));
+        var bitmap = new RenderTargetBitmap(new PixelSize(size, size));
         using (var context = bitmap.CreateDrawingContext())
-        using (context.PushTransform(Matrix.CreateScale(Size / Grid, Size / Grid)))
+        using (context.PushTransform(Matrix.CreateScale(size / Grid, size / Grid)))
         {
             context.DrawRectangle(Fill, Edge, new Rect(6, 6, 244, 244), 60, 60);
             Bar(context, 72, 0.42, Palette.CursorPool);

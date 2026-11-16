@@ -49,7 +49,7 @@ A aplicação continua a funcionar, com o comportamento anterior. Se as ilhas es
 - **Menu Iniciar e Vista de Tarefas:** com o menu Iniciar do Windows aberto, ou com a Vista de Tarefas, o Windows põe a barra por cima de qualquer janela normal, por isso as barras sobem para imediatamente acima dela e voltam ao sítio quando fecha. Um clique num ícone da barra também não as esconde.
 - **Posição:** arrasta para reposicionar. Fica em `%LOCALAPPDATA%\CursorMeter\offset.txt`.
 
-Se numa máquina não aparecerem, `.\scripts\debug-taskbar.ps1` diz a escala, o DPI da barra e se a janela está por baixo dela.
+Se numa máquina não aparecerem, abre **Acerca de** no menu do botão direito: mostra a versão e o ficheiro de registos (`%LOCALAPPDATA%\CursorMeter\cursormeter.log`), que diz como as barras foram colocadas. O botão **Enviar registos** copia o registo e abre uma issue no GitHub.
 
 ### Instalar
 

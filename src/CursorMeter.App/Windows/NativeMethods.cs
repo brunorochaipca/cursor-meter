@@ -39,6 +39,8 @@ internal static class NativeMethods
     public const uint TpmRightButton = 0x0002;
     public const uint TpmReturnCmd = 0x0100;
     public const int DwmwaCloaked = 14;
+    public const int DwmwaWindowCornerPreference = 33;
+    public const int DwmwcpRound = 2;
     public const int SimpleRegion = 2;
 
     public delegate void WinEventDelegate(
@@ -105,6 +107,9 @@ internal static class NativeMethods
 
     [DllImport("dwmapi.dll")]
     public static extern int DwmGetWindowAttribute(IntPtr hwnd, int attribute, out int value, int size);
+
+    [DllImport("dwmapi.dll")]
+    public static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
 
     [DllImport("user32.dll")]
     public static extern uint GetDpiForWindow(IntPtr hwnd);
