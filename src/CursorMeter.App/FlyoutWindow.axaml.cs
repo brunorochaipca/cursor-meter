@@ -2,7 +2,9 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Media;
 using Avalonia.Threading;
+using CursorMeter.App.Windows;
 
 namespace CursorMeter.App;
 
@@ -19,12 +21,37 @@ internal sealed partial class FlyoutWindow : Window
     public FlyoutWindow()
     {
         InitializeComponent();
+        TransparencyLevelHint = [WindowTransparencyLevel.Mica];
         RefreshButton.Click += (_, _) => RefreshRequested?.Invoke(this, EventArgs.Empty);
         DashboardButton.Click += (_, _) => DashboardRequested?.Invoke(this, EventArgs.Empty);
         LayoutUpdated += (_, _) => Reposition();
-        Opened += (_, _) => Dispatcher.UIThread.Post(() => Deactivated += (_, _) => CloseOnce());
+        Opened += (_, _) =>
+        {
+            RoundCorners();
+            Dispatcher.UIThread.Post(() => Deactivated += (_, _) => CloseOnce());
+        };
     }
 
+    /// <summary>
+    /// Windows 11 22H2 and later: Mica behind the card, as the Widgets board does, and round corners.
+    /// Elsewhere (or when Mica is not active) the card keeps its solid fill.
+    /// </summary>
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+        if (change.Property == ActualTransparencyLevelProperty)
+            Card.Background = ActualTransparencyLevel == WindowTransparencyLevel.Mica
+                ? Brushes.Transparent
+                : new SolidColorBrush(Color.FromRgb(0x18, 0x18, 0x18));
+    }
+
+    private void RoundCorners()
+    {
+        if (!OperatingSystem.IsWindowsVersionAtLeast(10, 0, 22621) || TryGetPlatformHandle()?.Handle is not { } hwnd)
+            return;
+        int round = NativeMethods.DwmwcpRound;
+        NativeMethods.DwmSetWindowAttribute(hwnd, NativeMethods.DwmwaWindowCornerPreference, ref round, sizeof(int));
+    }
     public event EventHandler? RefreshRequested;
     public event EventHandler? DashboardRequested;
 

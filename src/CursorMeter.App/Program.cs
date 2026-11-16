@@ -20,10 +20,13 @@ internal static class Program
     }
 
         // Windows 10 reparents the bars into the taskbar, where only a plain GDI blit shows.
-        // Windows 11 does not present that child, so the bars stay a top-level window. Software rendering covers both.
+        // Windows 11 does not present that child, so the bars stay a top-level window and Avalonia can use
+        // composition, the only mode where the flyout gets its Mica backdrop.
     public static AppBuilder BuildAvaloniaApp()
         => AppBuilder.Configure<App>()
             .UsePlatformDetect()
-            .With(new Win32PlatformOptions { RenderingMode = [Win32RenderingMode.Software] })
+            .With(OperatingSystem.IsWindowsVersionAtLeast(10, 0, 22621)
+                ? new Win32PlatformOptions()
+                : new Win32PlatformOptions { RenderingMode = [Win32RenderingMode.Software] })
             .LogToTrace();
 }
