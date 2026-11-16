@@ -58,7 +58,9 @@ No Windows, com o [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
 
 O instalador, `dist\CursorMeter-Setup-<versão>.exe`, sai de `.\scripts\build-installer.ps1`.
 
-O executável fica ao lado do relógio, dentro da barra de tarefas. Arrasta para o reposicionar. Clique abre o resumo. Botão direito: atualizar, abrir o painel, iniciar com o Windows, sair.
+O executável fica ao lado do relógio, na barra de tarefas. Arrasta para o reposicionar. Clique abre o resumo. Botão direito: atualizar, abrir o painel, iniciar com o Windows, sair.
+
+No Windows 10 as barras ficam dentro da barra. No Windows 11 (o 26H2 incluído) o sistema não mostra uma janela metida na barra: à escala de 100% não aparece nada, e à de 125% só aparece porque o Windows a amplia. As barras são desenhadas por cima da barra, no mesmo sítio, e seguem a escala do monitor. Se numa máquina não aparecerem, `.\scripts\debug-taskbar.ps1` diz a escala, o DPI da barra e se a janela está por baixo dela.
 
 A posição fica em `%LOCALAPPDATA%\CursorMeter\offset.txt`.
 

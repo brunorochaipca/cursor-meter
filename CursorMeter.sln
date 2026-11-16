@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CursorMeter.Core", "src\Cur
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CursorMeter.App", "src\CursorMeter.App\CursorMeter.App.csproj", "{CC161FB7-E4A5-4739-8205-8FC9E07BD993}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CursorMeter.Tests", "src\CursorMeter.Tests\CursorMeter.Tests.csproj", "{2A7BB4A4-35C1-4D6B-9BC9-E9E4437F0E69}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -26,9 +28,14 @@ Global
 		{CC161FB7-E4A5-4739-8205-8FC9E07BD993}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{CC161FB7-E4A5-4739-8205-8FC9E07BD993}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{CC161FB7-E4A5-4739-8205-8FC9E07BD993}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2A7BB4A4-35C1-4D6B-9BC9-E9E4437F0E69}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2A7BB4A4-35C1-4D6B-9BC9-E9E4437F0E69}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2A7BB4A4-35C1-4D6B-9BC9-E9E4437F0E69}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2A7BB4A4-35C1-4D6B-9BC9-E9E4437F0E69}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{7BDF4B0D-2B90-4198-8E81-3A169D5C521F} = {093D9E1A-DBC8-4741-974B-F303E2237558}
 		{CC161FB7-E4A5-4739-8205-8FC9E07BD993} = {093D9E1A-DBC8-4741-974B-F303E2237558}
+		{2A7BB4A4-35C1-4D6B-9BC9-E9E4437F0E69} = {093D9E1A-DBC8-4741-974B-F303E2237558}
 	EndGlobalSection
 EndGlobal

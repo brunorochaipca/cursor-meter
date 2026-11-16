@@ -10,12 +10,19 @@ internal static class NativeMethods
     public const int WsPopup = unchecked((int)0x80000000);
     public const int WsVisible = 0x10000000;
     public const int WsClipSiblings = 0x04000000;
+    public const int WsExTopMost = 0x00000008;
     public const int WsExToolWindow = 0x00000080;
+    public const int WsExNoActivate = 0x08000000;
+    public const int SwHide = 0;
+    public const int SwShowNoActivate = 4;
+    public static readonly IntPtr HwndTopMost = new(-1);
     public const uint SwpNoSize = 0x0001;
     public const uint SwpNoMove = 0x0002;
     public const uint SwpNoZOrder = 0x0004;
     public const uint SwpNoActivate = 0x0010;
+    public const uint SwpFrameChanged = 0x0020;
     public const uint SwpShowWindow = 0x0040;
+    public const uint SwpHideWindow = 0x0080;
     public const uint RdwInvalidate = 0x0001;
     public const uint RdwNoErase = 0x0020;
     public const uint RdwUpdateNow = 0x0100;
@@ -73,6 +80,12 @@ internal static class NativeMethods
 
     [DllImport("user32.dll")]
     public static extern bool SetWindowPos(IntPtr hwnd, IntPtr insertAfter, int x, int y, int cx, int cy, uint flags);
+
+    [DllImport("user32.dll")]
+    public static extern bool ShowWindow(IntPtr hwnd, int command);
+
+    [DllImport("user32.dll")]
+    public static extern uint GetDpiForWindow(IntPtr hwnd);
 
     [DllImport("user32.dll")]
     public static extern bool RedrawWindow(IntPtr hwnd, IntPtr updateRect, IntPtr updateRegion, uint flags);

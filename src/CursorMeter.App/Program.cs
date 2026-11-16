@@ -19,7 +19,8 @@ internal static class Program
         return code;
     }
 
-    // The widget is reparented into Explorer's taskbar; only plain GDI blits paint reliably inside another process's window.
+        // Windows 10 reparents the bars into the taskbar, where only a plain GDI blit shows.
+        // Windows 11 does not present that child, so the bars stay a top-level window. Software rendering covers both.
     public static AppBuilder BuildAvaloniaApp()
         => AppBuilder.Configure<App>()
             .UsePlatformDetect()
