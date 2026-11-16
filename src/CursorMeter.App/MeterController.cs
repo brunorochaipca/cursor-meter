@@ -236,6 +236,8 @@ internal sealed class MeterController : IDisposable
 
     private void Publish(MeterState state)
     {
+        if (state.Status != _state.Status)
+            AppLog.Info(state.Status is null ? "Usage loaded" : $"Usage unavailable: {state.Status}. {state.Detail}");
         _state = state;
         _taskbar?.Show(state);
         _flyout?.ShowState(state);

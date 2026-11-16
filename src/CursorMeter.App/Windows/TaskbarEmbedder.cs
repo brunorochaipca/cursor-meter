@@ -77,6 +77,7 @@ internal sealed class TaskbarEmbedder : IDisposable
         if (TaskbarLayout.IsCollapsed(taskbarPx))
         {
             // A child is clipped by the shrunk taskbar. An overlay would sit on the desktop edge.
+            Mode("taskbar collapsed, bars hidden");
             if (overlay)
                 HoldHidden();
             return;
@@ -93,6 +94,8 @@ internal sealed class TaskbarEmbedder : IDisposable
         _widget.ShowIsland(island?.Look);
         if (island is { } onIsland)
         {
+            var look = onIsland.Look;
+            Mode($"island, slot {Describe(onIsland.Slot)}, radius {look.Radius:0.#}, outline {look.OutlineWidth:0.##}px, dpi {dpi}");
             DockOver(onIsland.Slot, lifted: false);
             return;
         }
@@ -101,6 +104,7 @@ internal sealed class TaskbarEmbedder : IDisposable
         var screenSlot = TaskbarLayout.Place(taskbarPx, trayPx, edge, _delta, width, height);
         if (screenSlot.IsEmpty)
         {
+            Mode("no room on the taskbar, bars hidden");
             if (overlay)
                 HoldHidden();
             return;
@@ -110,10 +114,12 @@ internal sealed class TaskbarEmbedder : IDisposable
         {
             bool lift = TaskbarInOtherBand(taskbar) || MenuCoversTaskbar();
             var slot = lift ? TaskbarLayout.Beside(taskbarPx, screenSlot, edge, monitor) : screenSlot;
+            Mode($"{(lift ? "overlay beside the taskbar" : "overlay on the taskbar")}, no island, slot {Describe(slot)}, dpi {dpi}");
             DockOver(slot, lift);
         }
         else
         {
+            Mode($"embedded in the taskbar, slot {Describe(screenSlot)}, dpi {dpi}");
             Embed(taskbar, taskbarPx, screenSlot, allowReparent);
         }
     }
@@ -521,8 +527,22 @@ internal sealed class TaskbarEmbedder : IDisposable
         NativeMethods.ShowWindow(_widget.Handle, NativeMethods.SwHide);
     }
 
+    private string? _lastMode;
+
+    /// <summary>Logs how the bars are placed, only when that changes.</summary>
+    private void Mode(string mode)
+    {
+        if (mode == _lastMode)
+            return;
+        _lastMode = mode;
+        AppLog.Info("Placement: " + mode);
+    }
+
+    private static string Describe(PxRect rect) => $"{rect.Left},{rect.Top} {rect.Width}x{rect.Height}";
+
     private void DockFallback()
     {
+        Mode("no taskbar found, floating in the screen corner");
         _onIsland = false;
         _widget.ShowIsland(null);
         Embedded = _widget.Embedded = false;

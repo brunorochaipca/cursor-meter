@@ -12,10 +12,16 @@ public sealed partial class App : Application
 
     public override void OnFrameworkInitializationCompleted()
     {
+        AppLog.HookUnhandledErrors();
+        AppLog.Info($"Start {typeof(App).Assembly.GetName().Version}, {Environment.OSVersion}, {System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription}");
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             _controller = new MeterController(desktop);
-            desktop.Exit += (_, _) => _controller.Dispose();
+            desktop.Exit += (_, _) =>
+            {
+                AppLog.Info("Exit");
+                _controller.Dispose();
+            };
         }
 
         base.OnFrameworkInitializationCompleted();

@@ -39,10 +39,12 @@ internal sealed partial class FlyoutWindow : Window
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
-        if (change.Property == ActualTransparencyLevelProperty)
-            Card.Background = ActualTransparencyLevel == WindowTransparencyLevel.Mica
-                ? Brushes.Transparent
-                : new SolidColorBrush(Color.FromRgb(0x18, 0x18, 0x18));
+        if (change.Property != ActualTransparencyLevelProperty)
+            return;
+        AppLog.Info($"Flyout backdrop: {ActualTransparencyLevel}");
+        Card.Background = ActualTransparencyLevel == WindowTransparencyLevel.Mica
+            ? Brushes.Transparent
+            : new SolidColorBrush(Color.FromRgb(0x18, 0x18, 0x18));
     }
 
     private void RoundCorners()
