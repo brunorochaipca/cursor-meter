@@ -11,10 +11,29 @@ namespace CursorMeter.App;
 internal sealed class QuotaBars : Control
 {
     private const double TextSize = 32d / 3;
-    private static readonly IPen BorderPen = new Pen(Palette.Border);
+    public static readonly IPen DefaultOutline = new Pen(Palette.Border);
 
     private UsageQuotas? _quotas;
     private string _status = MeterState.Loading.Status!;
+    private IBrush _fill = Palette.Background;
+    private IPen? _outline = DefaultOutline;
+    private double _radius;
+    private double _margin;
+    private double _inset = 0.5;
+
+    /// <summary>
+    /// Sets the box behind the bars: <paramref name="margin"/> in from the control's edge, with
+    /// the outline centred a further <paramref name="inset"/> inside the box.
+    /// </summary>
+    public void ShowFrame(IBrush fill, IPen? outline, double radius, double margin, double inset)
+    {
+        _fill = fill;
+        _outline = outline;
+        _radius = radius;
+        _margin = margin;
+        _inset = inset;
+        InvalidateVisual();
+    }
 
     public void ShowQuotas(UsageQuotas quotas)
     {
@@ -32,8 +51,13 @@ internal sealed class QuotaBars : Control
     public override void Render(DrawingContext context)
     {
         var size = Bounds.Size;
-        context.FillRectangle(Palette.Background, new Rect(size));
-        context.DrawRectangle(BorderPen, new Rect(size).Deflate(0.5));
+        var box = new Rect(size).Deflate(_margin);
+        context.DrawRectangle(_fill, null, box, _radius, _radius);
+        if (_outline is not null)
+        {
+            double radius = Math.Max(0, _radius - _inset);
+            context.DrawRectangle(null, _outline, box.Deflate(_inset), radius, radius);
+        }
 
         if (_quotas is null)
         {

@@ -396,7 +396,8 @@ internal sealed class StatusNotifierItem : IMethodHandler, IDisposable
         }
     }
 
-    // StatusNotifierItem pixmaps are ARGB32 in network byte order. The icon is opaque, so premultiplied alpha changes nothing.
+    // StatusNotifierItem pixmaps are ARGB32 in network byte order, with straight alpha. The bitmap is premultiplied,
+    // and only the antialiased edge of the rounded corners is not opaque.
     private static byte[] IconArgb(RenderTargetBitmap bitmap)
     {
         var pixels = new byte[AppIcon.Size * AppIcon.Size * 4];
@@ -415,7 +416,15 @@ internal sealed class StatusNotifierItem : IMethodHandler, IDisposable
         {
             var (red, blue) = rgba ? (pixels[i], pixels[i + 2]) : (pixels[i + 2], pixels[i]);
             var green = pixels[i + 1];
-            pixels[i] = pixels[i + 3];
+            var alpha = pixels[i + 3];
+            if (alpha is > 0 and < 255)
+            {
+                red = (byte)Math.Min(255, (red * 255 + (alpha / 2)) / alpha);
+                green = (byte)Math.Min(255, (green * 255 + (alpha / 2)) / alpha);
+                blue = (byte)Math.Min(255, (blue * 255 + (alpha / 2)) / alpha);
+            }
+
+            pixels[i] = alpha;
             pixels[i + 1] = red;
             pixels[i + 2] = green;
             pixels[i + 3] = blue;

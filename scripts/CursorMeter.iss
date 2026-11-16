@@ -39,6 +39,7 @@ WizardStyle=modern
 CloseApplications=yes
 RestartApplications=no
 AppMutex=Local\CursorMeter
+SetupIconFile=..\assets\CursorMeter.ico
 UninstallDisplayIcon={app}\{#MyAppName}.exe
 UninstallDisplayName={#MyAppName}
 VersionInfoVersion={#VersionInfoVersion}

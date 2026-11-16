@@ -2,6 +2,8 @@ using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Media;
+using Avalonia.Media.Immutable;
 
 namespace CursorMeter.App.Windows;
 
@@ -16,6 +18,7 @@ internal sealed class WidgetWindow : Window
     private bool _closed;
     private NativeMethods.Point _dragCursor;
     private NativeMethods.Rect _dragWindow;
+    private IslandLook? _island;
 
     public WidgetWindow()
     {
@@ -67,6 +70,38 @@ internal sealed class WidgetWindow : Window
         : null;
 
     public int ToPixels(double value) => (int)Math.Round(value * RenderScaling);
+
+    /// <summary>Draws the bars as a rounded island, or as the plain box with <c>null</c>.</summary>
+    public void ShowIsland(IslandLook? island)
+    {
+        if (island == _island)
+            return;
+
+        _island = island;
+        if (island is null)
+        {
+            TransparencyLevelHint = [];
+            Background = Palette.Background;
+            _bars.ShowFrame(Palette.Background, QuotaBars.DefaultOutline, 0, 0, 0.5);
+            return;
+        }
+
+        // The window is transparent and Margin pixels larger than the island on every side, so the
+        // antialiased corners and the outer half of the outline blend with whatever is behind,
+        // as Start11 draws them. Its outline is centred on the island's outermost row of pixels.
+        double pixel = 1 / RenderScaling;
+        var outline = island.Outline is { } color
+            ? new Pen(new ImmutableSolidColorBrush(color), island.OutlineWidth)
+            : null;
+        TransparencyLevelHint = [WindowTransparencyLevel.Transparent];
+        Background = Brushes.Transparent;
+        _bars.ShowFrame(
+            new ImmutableSolidColorBrush(island.Fill),
+            outline,
+            island.Radius * pixel,
+            island.Margin * pixel,
+            pixel / 2);
+    }
 
     public void ShowState(MeterState state)
     {
