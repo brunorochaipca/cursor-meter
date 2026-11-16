@@ -25,6 +25,9 @@ internal sealed class TaskbarHost : IDisposable
             AppLog.Info("Explorer recreated the taskbar (TaskbarCreated)");
             KeepOnTaskbar();
         };
+        _shell.TrayClicked += (_, _) => Clicked?.Invoke(this, EventArgs.Empty);
+        _shell.TrayMenuRequested += (_, _) => _shell.ShowMenu(_menu);
+        _shell.AddTrayIcon("CursorMeter");
         _placeTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
         _placeTimer.Tick += (_, _) => KeepOnTaskbar();
         CreateWidget();
@@ -41,6 +44,8 @@ internal sealed class TaskbarHost : IDisposable
         _state = state;
         _widget?.ShowState(state);
     }
+
+    public void SetTooltip(string tip) => _shell.SetTooltip(tip);
 
     public void Dispose()
     {

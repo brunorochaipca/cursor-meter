@@ -43,6 +43,21 @@ internal static class NativeMethods
     public const int DwmwcpRound = 2;
     public const int SimpleRegion = 2;
 
+    // Notification area icon.
+    public const uint WmTray = 0x8001; // WM_APP + 1
+    public const uint WmContextMenu = 0x007B;
+    public const uint NinSelect = 0x0400;
+    public const uint NinKeySelect = 0x0401;
+    public const uint NimAdd = 0;
+    public const uint NimModify = 1;
+    public const uint NimDelete = 2;
+    public const uint NimSetVersion = 4;
+    public const uint NifMessage = 0x1;
+    public const uint NifIcon = 0x2;
+    public const uint NifTip = 0x4;
+    public const int SmCxSmIcon = 49;
+    public const int IdiApplication = 32512;
+
     public delegate void WinEventDelegate(
         IntPtr hook,
         uint eventType,
@@ -110,6 +125,50 @@ internal static class NativeMethods
 
     [DllImport("dwmapi.dll")]
     public static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
+
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+    public static extern bool Shell_NotifyIcon(uint message, ref NotifyIconData data);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    public static extern uint PrivateExtractIcons(string file, int index, int width, int height, IntPtr[] icons, uint[]? ids, uint count, uint flags);
+
+    [DllImport("user32.dll")]
+    public static extern IntPtr LoadIcon(IntPtr instance, IntPtr name);
+
+    [DllImport("user32.dll")]
+    public static extern bool DestroyIcon(IntPtr icon);
+
+    [DllImport("user32.dll")]
+    public static extern int GetSystemMetrics(int index);
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    public struct NotifyIconData
+    {
+        public int Size;
+        public IntPtr Window;
+        public uint Id;
+        public uint Flags;
+        public uint CallbackMessage;
+        public IntPtr Icon;
+
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)]
+        public string Tip;
+
+        public uint State;
+        public uint StateMask;
+
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 256)]
+        public string Info;
+
+        public uint Version;
+
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 64)]
+        public string InfoTitle;
+
+        public uint InfoFlags;
+        public Guid Item;
+        public IntPtr BalloonIcon;
+    }
 
     [DllImport("user32.dll")]
     public static extern uint GetDpiForWindow(IntPtr hwnd);
