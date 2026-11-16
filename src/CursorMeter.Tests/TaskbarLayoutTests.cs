@@ -58,6 +58,22 @@ public sealed class TaskbarLayoutTests
     }
 
     [Fact]
+    public void Beside_steps_above_a_bottom_taskbar_while_start_is_open()
+    {
+        var taskbar = new PxRect(0, 1032, 1920, 1080);
+        var slot = new PxRect(1442, 1034, 1694, 1078);
+        var monitor = new PxRect(0, 0, 1920, 1080);
+
+        var lifted = TaskbarLayout.Beside(taskbar, slot, BarEdge.Bottom, monitor);
+
+        Assert.Equal(slot.Left, lifted.Left);
+        Assert.Equal(taskbar.Top - slot.Height, lifted.Top);
+        Assert.Equal(taskbar.Top, lifted.Bottom);
+        Assert.Equal(slot.Width, lifted.Width);
+        Assert.True(lifted.Bottom <= taskbar.Top);
+    }
+
+    [Fact]
     public void Screen_slot_matches_the_windows_10_client_slot()
     {
         var screenBar = new PxRect(0, 1032, 1920, 1080);
