@@ -5,6 +5,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Media.Immutable;
+using Avalonia.Threading;
 
 namespace CursorMeter.App.Windows;
 
@@ -21,8 +22,8 @@ internal sealed class WidgetWindow : Window
     private NativeMethods.Rect _dragWindow;
     private IslandLook? _island;
     private bool _floating;
-
-    private const double FadedOpacity = 0.4;
+    private BarFrame? _frame;
+    private AppSettings _settings = SettingsStore.Current;
 
     public WidgetWindow()
     {
@@ -41,6 +42,9 @@ internal sealed class WidgetWindow : Window
         Cursor = new Cursor(StandardCursorType.Hand);
         Title = "CursorMeter";
         Content = _bars;
+        _bars.ApplyStyle(BarStyle.From(_settings));
+        UpdateLook();
+        SettingsStore.Changed += OnSettingsChanged;
 
         Handle = TryGetPlatformHandle()?.Handle
             ?? throw new InvalidOperationException("A janela das barras não tem HWND.");
@@ -91,42 +95,46 @@ internal sealed class WidgetWindow : Window
             if (_floating == value)
                 return;
             _floating = value;
+            UpdateLook();
             UpdateFade();
         }
     }
 
-    /// <summary>Draws the bars as a rounded island, or as the plain box with <c>null</c>.</summary>
+    /// <summary>
+    /// Draws the bars as a rounded island, or as the plain box with <c>null</c>. While the bars
+    /// float, the theme of the settings decides what the box looks like.
+    /// </summary>
     public void ShowIsland(IslandLook? island)
     {
-        if (island == _island)
-            return;
-
+        // Also redrawn when only the scale changed, as the bars move to a monitor with another zoom.
         _island = island;
-        if (island is null)
-        {
-            TransparencyLevelHint = [];
-            Background = Palette.Background;
-            _bars.ShowFrame(Palette.Background, QuotaBars.DefaultOutline, 0, 0, 0.5);
-            return;
-        }
-
-        // The window is transparent and Margin pixels larger than the island on every side, so the
-        // antialiased corners and the outer half of the outline blend with whatever is behind,
-        // as Start11 draws them. Its outline is centred on the island's outermost row of pixels.
-        double pixel = 1 / RenderScaling;
-        var outline = island.Outline is { } color
-            ? new Pen(new ImmutableSolidColorBrush(color), island.OutlineWidth)
-            : null;
-        TransparencyLevelHint = [WindowTransparencyLevel.Transparent];
-        Background = Brushes.Transparent;
-        _bars.ShowFrame(
-            new ImmutableSolidColorBrush(island.Fill),
-            outline,
-            island.Radius * pixel,
-            island.Margin * pixel,
-            pixel / 2);
+        UpdateLook();
     }
 
+    private void OnSettingsChanged(object? sender, EventArgs e) => Dispatcher.UIThread.Post(() =>
+    {
+        if (_closed)
+            return;
+        _settings = SettingsStore.Current;
+        _bars.ApplyStyle(BarStyle.From(_settings));
+        UpdateLook();
+        UpdateFade();
+    });
+
+    private void UpdateLook()
+    {
+        var frame = BarFrame.Resolve(_settings, _island, _floating, RenderScaling);
+        if (frame == _frame)
+            return;
+
+        // An island window is transparent and Margin pixels larger than the island on every side, so
+        // the antialiased corners and the outer half of the outline blend with whatever is behind,
+        // as Start11 draws them. Its outline is centred on the island's outermost row of pixels.
+        _frame = frame;
+        TransparencyLevelHint = frame.Transparent ? [WindowTransparencyLevel.Transparent] : [];
+        Background = frame.Transparent ? Brushes.Transparent : Palette.Background;
+        _bars.ShowFrame(frame.FillBrush, frame.OutlinePen, frame.Radius, frame.Margin, frame.Inset);
+    }
     public void ShowState(MeterState state)
     {
         if (state.Quotas is { } quotas)
@@ -153,7 +161,7 @@ internal sealed class WidgetWindow : Window
         UpdateFade();
     }
 
-    private void UpdateFade() => _bars.Opacity = !_floating || _dragging || IsPointerOver ? 1 : FadedOpacity;
+    private void UpdateFade() => _bars.Opacity = !_floating || _dragging || IsPointerOver ? 1 : _settings.FadedOpacity / 100d;
 
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
@@ -202,6 +210,7 @@ internal sealed class WidgetWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         _closed = true;
+        SettingsStore.Changed -= OnSettingsChanged;
         base.OnClosed(e);
     }
 

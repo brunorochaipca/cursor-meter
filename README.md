@@ -59,6 +59,18 @@ Com muitas janelas abertas, a ilha dos ícones do Start11 cresce para a esquerda
 - **Escondíveis.** No menu (botão direito nas barras ou no ícone da área de notificação), "Esconder as barras flutuantes". Só vale enquanto não houver espaço para a ilha.
 - **Voltam sozinhas.** Quando fechas janelas e a ilha volta a caber, as barras regressam ao canto da barra de tarefas. Pedem uns pixéis a mais para voltar do que para sair, para não oscilarem.
 
+### Definições
+
+Botão direito nas barras ou no ícone da área de notificação, **Definições…**. A janela é parecida com a do Start11: secções à esquerda, um cartão por definição e, em cima, uma pré-visualização das barras que acompanha cada alteração. Tudo se aplica logo e fica em `%LOCALAPPDATA%\CursorMeter\settings.txt`.
+
+- **Aspeto:** tema (Automático, Escuro, **Transparente** ou Seguir o Start11), opacidade do fundo, contorno, cantos, tamanho do texto, mostrar uma só pool e mostrar o que resta em vez do que usaste.
+- **Cores:** texto, texto secundário, as duas pools, aviso, crítico e contorno. Para o tema transparente, escolhe um texto claro ou escuro conforme a tua barra de tarefas.
+- **Utilização e alertas:** de quanto em quanto tempo lê a quota (1, 3, 5 ou 10 minutos) e a partir de que valor a barra passa a aviso (70% por omissão) e a crítico (90%).
+- **Barras flutuantes:** opacidade em repouso, esconder e repor a posição.
+- **Geral:** iniciar com o Windows e repor todas as definições.
+
+O tema, a opacidade, o contorno e os cantos valem só **fora do modo ilha**: na caixa junto ao relógio, no Windows 10 e quando as barras flutuam. Como ilha da barra de tarefas, as barras seguem sempre as cores do Start11. O tema transparente não foi testado no Windows 10.
+
 ### Sem o Start11 v3, ou sem ilhas
 
 A aplicação continua a funcionar, com o comportamento anterior. Se as ilhas estiverem desligadas (estilo Sólido ou Arredondado), se o Start11 não estiver instalado, ou se não houver espaço, as barras aparecem numa caixa ao lado da área de notificação, junto ao relógio.

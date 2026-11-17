@@ -29,6 +29,7 @@ internal sealed class MeterController : IDisposable
     private MeterState _state = MeterState.Loading;
     private FlyoutWindow? _flyout;
     private AboutWindow? _about;
+    private SettingsWindow? _settings;
     private DateTime _flyoutClosedAt;
     private bool _refreshing;
     private bool _disposed;
@@ -64,9 +65,10 @@ internal sealed class MeterController : IDisposable
             _taskbar.Show(_state);
         }
 
-        _usageTimer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(3) };
+        _usageTimer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(SettingsStore.Current.RefreshMinutes) };
         _usageTimer.Tick += (_, _) => _ = RefreshAsync();
         _usageTimer.Start();
+        SettingsStore.Changed += OnSettingsChanged;
         _ = RefreshAsync();
     }
 
@@ -75,9 +77,11 @@ internal sealed class MeterController : IDisposable
         if (_disposed)
             return;
         _disposed = true;
+        SettingsStore.Changed -= OnSettingsChanged;
         _usageTimer.Stop();
         _flyout?.Close();
         _about?.Close();
+        _settings?.Close();
         _taskbar?.Dispose();
         _tray?.Dispose();
         _statusItem?.Dispose();
@@ -92,6 +96,7 @@ internal sealed class MeterController : IDisposable
             menu.Add(new("Mostrar resumo", ToggleFlyout));
         menu.Add(new("Atualizar", () => _ = RefreshAsync()));
         menu.Add(new("Painel do Cursor", OpenDashboard));
+        menu.Add(new("Definições…", ShowSettings));
         if (OperatingSystem.IsWindows())
         {
             menu.Add(StartupShortcut.MenuEntry());
@@ -142,6 +147,33 @@ internal sealed class MeterController : IDisposable
         SyncToggles();
         menu.Opening += (_, _) => SyncToggles();
         return menu;
+    }
+
+    private void OnSettingsChanged(object? sender, EventArgs e)
+    {
+        var interval = TimeSpan.FromMinutes(SettingsStore.Current.RefreshMinutes);
+        if (_usageTimer.Interval != interval)
+            _usageTimer.Interval = interval;
+    }
+
+    private void ShowSettings()
+    {
+        if (_disposed)
+            return;
+        if (_settings is not null)
+        {
+            _settings.Activate();
+            return;
+        }
+
+        var hooks = OperatingSystem.IsWindows()
+            ? new SettingsHooks(StartupShortcut.MenuEntry(), FloatingSettings.MenuEntry(), FloatingSettings.ResetPosition)
+            : new SettingsHooks(OperatingSystem.IsLinux() ? AutostartEntry.MenuEntry() : null, null, null);
+        var window = new SettingsWindow(hooks);
+        window.Closed += (_, _) => _settings = null;
+        _settings = window;
+        window.Show();
+        window.Activate();
     }
 
     private void ShowAbout()

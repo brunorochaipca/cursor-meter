@@ -13,13 +13,16 @@ public sealed record UsageQuotas(double CursorModelsPercent, double OtherModelsP
     public QuotaTone CursorTone => ToneOf(CursorModelsPercent);
     public QuotaTone OtherTone => ToneOf(OtherModelsPercent);
 
-    public static QuotaTone ToneOf(double percent)
+    public static QuotaTone ToneOf(double percent) => ToneOf(percent, AppSettings.DefaultWarnAt, AppSettings.DefaultHotAt);
+
+    /// <summary>The tone of a pool that has used <paramref name="percent"/>, warning from <paramref name="warnAt"/> and critical from <paramref name="hotAt"/>.</summary>
+    public static QuotaTone ToneOf(double percent, double warnAt, double hotAt)
     {
         if (double.IsNaN(percent))
             return QuotaTone.Unknown;
-        if (percent >= 90)
+        if (percent >= hotAt)
             return QuotaTone.Hot;
-        if (percent >= 70)
+        if (percent >= warnAt)
             return QuotaTone.Warn;
         return QuotaTone.Ok;
     }

@@ -174,8 +174,8 @@ internal sealed class TaskbarEmbedder : IDisposable
         ReleaseHole(taskbar);
         _floating = true;
         _onIsland = false;
-        _widget.ShowIsland(noRoom.Look);
         _widget.Floating = true;
+        _widget.ShowIsland(noRoom.Look);
         string reason = $"no room for the island ({noRoom.Room}px), radius {noRoom.Look.Radius:0.#}, dpi {dpi}";
         if (FloatingSettings.State.Hidden)
         {

@@ -12,6 +12,7 @@ internal static class Palette
     public static readonly IImmutableSolidColorBrush Track = Brush(48, 48, 48);
     public static readonly IImmutableSolidColorBrush CursorPool = Brush(125, 206, 160);
     public static readonly IImmutableSolidColorBrush OtherPool = Brush(224, 177, 90);
+    public static readonly IImmutableSolidColorBrush Warn = Brush(224, 177, 90);
     public static readonly IImmutableSolidColorBrush Hot = Brush(224, 106, 92);
 
     private static ImmutableSolidColorBrush Brush(byte r, byte g, byte b) => new(Color.FromRgb(r, g, b));

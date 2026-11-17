@@ -19,6 +19,14 @@ internal static class FloatingSettings
         Save();
     }
 
+    /// <summary>Forgets where the bars were dropped, so they float at the corner again.</summary>
+    public static void ResetPosition()
+    {
+        _state = _state with { Left = null, Top = null };
+        Save();
+        Changed?.Invoke(null, EventArgs.Empty);
+    }
+
     public static void ToggleHidden()
     {
         _state = _state with { Hidden = !_state.Hidden };

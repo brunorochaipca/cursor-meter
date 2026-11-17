@@ -10,11 +10,11 @@ namespace CursorMeter.App;
 /// </summary>
 internal sealed class QuotaBars : Control
 {
-    private const double TextSize = 32d / 3;
     public static readonly IPen DefaultOutline = new Pen(Palette.Border);
 
     private UsageQuotas? _quotas;
     private string _status = MeterState.Loading.Status!;
+    private BarStyle _style = BarStyle.Default;
     private IBrush _fill = Palette.Background;
     private IPen? _outline = DefaultOutline;
     private double _radius;
@@ -32,6 +32,12 @@ internal sealed class QuotaBars : Control
         _radius = radius;
         _margin = margin;
         _inset = inset;
+        InvalidateVisual();
+    }
+
+    public void ApplyStyle(BarStyle style)
+    {
+        _style = style;
         InvalidateVisual();
     }
 
@@ -61,28 +67,34 @@ internal sealed class QuotaBars : Control
 
         if (_quotas is null)
         {
-            var status = Text(_status, Palette.Muted, size.Width - 8, TextAlignment.Center);
+            var status = Text(_status, _style.Muted, size.Width - 8, TextAlignment.Center);
             context.DrawText(status, new Point(4, (size.Height - status.Height) / 2));
             return;
         }
 
-        DrawRow(context, 0, "Cursor Models", _quotas.CursorModelsPercent, Palette.CursorPool);
-        DrawRow(context, 1, "Other Models", _quotas.OtherModelsPercent, Palette.OtherPool);
+        var rows = new List<(string Label, double Percent, IBrush Pool)>(2);
+        if (_style.Pools != PoolView.OtherOnly)
+            rows.Add(("Cursor Models", _quotas.CursorModelsPercent, _style.CursorPool));
+        if (_style.Pools != PoolView.CursorOnly)
+            rows.Add(("Other Models", _quotas.OtherModelsPercent, _style.OtherPool));
+        for (int i = 0; i < rows.Count; i++)
+            DrawRow(context, i, rows.Count, rows[i].Label, rows[i].Percent, rows[i].Pool);
     }
 
-    private void DrawRow(DrawingContext context, int index, string label, double percent, IBrush poolColor)
+    private void DrawRow(DrawingContext context, int index, int rows, string label, double used, IBrush poolColor)
     {
         var width = Bounds.Width;
-        var rowHeight = Math.Max(12, (Bounds.Height - 6) / 2);
+        var rowHeight = Math.Max(12, (Bounds.Height - 6) / rows);
         var y = 3 + (index * rowHeight);
-        var tone = UsageQuotas.ToneOf(percent);
+        var tone = UsageQuotas.ToneOf(used, _style.WarnAt, _style.HotAt);
         var fill = tone switch
         {
-            QuotaTone.Hot => Palette.Hot,
-            QuotaTone.Warn => Palette.OtherPool,
+            QuotaTone.Hot => _style.Hot,
+            QuotaTone.Warn => _style.Warn,
             _ => poolColor,
         };
-        var textBrush = tone == QuotaTone.Hot ? fill : Palette.Text;
+        var textBrush = tone == QuotaTone.Hot ? fill : _style.Text;
+        var percent = _style.ShowRemaining && !double.IsNaN(used) ? Math.Max(0, 100 - used) : used;
 
         var labelText = Text(label, textBrush, 92, TextAlignment.Left);
         context.DrawText(labelText, new Point(8, y + ((rowHeight - labelText.Height) / 2)));
@@ -98,9 +110,8 @@ internal sealed class QuotaBars : Control
         var percentText = Text(QuotaText.Format(percent), textBrush, 38, TextAlignment.Right);
         context.DrawText(percentText, new Point(width - 44, y + ((rowHeight - percentText.Height) / 2)));
     }
-
-    private static FormattedText Text(string text, IBrush brush, double maxWidth, TextAlignment alignment)
-        => new(text, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, Typeface.Default, TextSize, brush)
+    private FormattedText Text(string text, IBrush brush, double maxWidth, TextAlignment alignment)
+        => new(text, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, Typeface.Default, _style.TextSize, brush)
         {
             MaxTextWidth = Math.Max(1, maxWidth),
             MaxLineCount = 1,
