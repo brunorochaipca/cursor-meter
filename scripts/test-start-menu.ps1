@@ -22,8 +22,16 @@
     e num PC com Start11 e noutro sem Start11.
 
     Durante o teste o script carrega na tecla Windows. Nao uses o teclado nem o rato.
-    Saida: pasta com capturas (.png), resultado.md e resultado.json. Codigo de saida 1
-    se algum teste falhar.
+    Cada execucao cria uma pasta em %LOCALAPPDATA%\CursorMeter\testes\<data>-<etiqueta> com:
+      teste.log        tudo o que o script escreveu (ambiente, medidas, resultados)
+      cursormeter.log  copia do registo da propria app (linhas "Placement:")
+      resultado.md     tabela de resultados
+      resultado.json   os mesmos resultados, para ler por programa
+      *.png            capturas da zona das barras e do ecra inteiro
+    O caminho da ultima execucao fica em %LOCALAPPDATA%\CursorMeter\testes\ultimo.txt.
+    Codigo de saida 0 sem falhas, 1 com falhas, 2 se o proprio script deu erro.
+
+    Duplo clique em scripts\test-start-menu.cmd faz o mesmo sem abrir a consola a mao.
 
 .PARAMETER SoAmbiente
     So mostra o ambiente e uma leitura. Nao carrega em nenhuma tecla. Seguro para correr a qualquer altura.
@@ -37,6 +45,9 @@
 .PARAMETER TesteCrash
     Termina o CursorMeter com o menu aberto para ver se o recorte fica na barra, volta a abri-lo e
     limpa o recorte no fim. Pede confirmacao, a menos que se use -Sim.
+
+.PARAMETER Saida
+    Pasta onde guardar o log e as capturas. Por omissao uma pasta nova em %LOCALAPPDATA%\CursorMeter\testes.
 
 .PARAMETER Etiqueta
     Texto livre para a pasta de saida, por exemplo 125pct ou start11.
@@ -64,6 +75,8 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+# Inside a function $PSBoundParameters is the function's own, so keep the script's here for the log header.
+$script:BoundArgs = $PSBoundParameters
 
 if (-not ('CursorMeterProbe.Probe' -as [type])) {
 Add-Type -TypeDefinition @'
@@ -1027,20 +1040,48 @@ function Invoke-Observar {
 
 # ---------------------------------------------------------------- main
 
-if ($Observar) { Invoke-Observar; return }
+$script:ExitCode = 0
 
-$environment = Get-Environment
-Write-Environment $environment
-if ($SoAmbiente) { return }
-
-if ([string]::IsNullOrEmpty($Saida)) {
-    $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-    $folder = if ($Etiqueta) { '{0}-{1}' -f $stamp, $Etiqueta } else { $stamp }
-    $Saida = Join-Path (Join-Path $env:TEMP 'CursorMeter-teste-menu') $folder
+# Copy of the app's own log, so the run and the app's view of it sit in the same folder.
+function Save-AppLog {
+    try {
+        if (Test-Path -LiteralPath $LogPath) {
+            Get-Content -LiteralPath $LogPath -Tail 500 | Set-Content -LiteralPath (Join-Path $Saida 'cursormeter.log') -Encoding UTF8
+        }
+    } catch {
+        Write-Host ('(nao consegui copiar o registo da app: {0})' -f $_.Exception.Message) -ForegroundColor DarkYellow
+    }
 }
-New-Item -ItemType Directory -Force -Path $Saida | Out-Null
 
-Write-Host ''
+function Invoke-Main {
+    # The folder comes first so that the log covers the whole run, including the environment.
+    $root = Join-Path $env:LOCALAPPDATA 'CursorMeter\testes'
+    if ([string]::IsNullOrEmpty($Saida)) {
+        $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+        $folder = if ($Etiqueta) { '{0}-{1}' -f $stamp, $Etiqueta } else { $stamp }
+        # Script scope: Invoke-Case and the log copy read it too.
+        $script:Saida = Join-Path $root $folder
+    }
+    New-Item -ItemType Directory -Force -Path $Saida | Out-Null
+    New-Item -ItemType Directory -Force -Path $root | Out-Null
+    Set-Content -LiteralPath (Join-Path $root 'ultimo.txt') -Value $Saida -Encoding UTF8
+    Start-Transcript -Path (Join-Path $Saida 'teste.log') -Force | Out-Null
+
+    $commit = ''
+    try { $commit = (& git -C $PSScriptRoot rev-parse --short HEAD 2>$null) } catch { }
+    Write-Host ('Teste do menu Iniciar do CursorMeter, {0:yyyy-MM-dd HH:mm:ss}' -f (Get-Date))
+    Write-Host ('Script: {0}  commit: {1}' -f $PSCommandPath, $(if ($commit) { $commit } else { '?' }))
+    Write-Host ('Argumentos: {0}' -f $(if ($script:BoundArgs.Count) { (($script:BoundArgs.GetEnumerator() | ForEach-Object { if ($_.Value -is [System.Management.Automation.SwitchParameter]) { '-' + $_.Key } else { '-{0} {1}' -f $_.Key, $_.Value } }) -join ' ') } else { '(nenhum)' }))
+    Write-Host ('PowerShell {0}, utilizador {1}, maquina {2}' -f $PSVersionTable.PSVersion, $env:USERNAME, $env:COMPUTERNAME)
+    Write-Host ('Pasta do teste e do log: {0}' -f $Saida)
+
+    if ($Observar) { Invoke-Observar; Save-AppLog; return }
+
+    $environment = Get-Environment
+    Write-Environment $environment
+    if ($SoAmbiente) { Save-AppLog; return }
+
+    Write-Host ''
 Write-Host 'Nao uses o teclado nem o rato durante o teste. A comecar em 3 s...' -ForegroundColor Yellow
 Start-Sleep -Seconds 3
 
@@ -1085,6 +1126,20 @@ $report | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $Saida '
 Write-Host ''
 if ($failures -gt 0) { Write-Host ('{0} falha(s), {1} aviso(s), {2} inconclusivo(s).' -f $failures, $warnings, $inconclusive) -ForegroundColor Red }
 else { Write-Host ('Sem falhas. {0} aviso(s), {1} inconclusivo(s).' -f $warnings, $inconclusive) -ForegroundColor Green }
+Save-AppLog
 Write-Host ('Resultados e capturas em: {0}' -f $Saida)
+Write-Host ('Log completo do teste:    {0}' -f (Join-Path $Saida 'teste.log'))
+Write-Host ('Registo da app (copia):   {0}' -f (Join-Path $Saida 'cursormeter.log'))
 Write-Host 'Repete a 125% e 150% de escala e, se puderes, num PC com e sem Start11 (-Etiqueta separa as pastas).'
-if ($failures -gt 0) { exit 1 }
+if ($failures -gt 0) { $script:ExitCode = 1 }
+}
+
+try {
+    Invoke-Main | Out-Null
+} catch {
+    Write-Host ('ERRO: ' + $_.Exception.ToString()) -ForegroundColor Red
+    $script:ExitCode = 2
+} finally {
+    try { Stop-Transcript | Out-Null } catch { }
+}
+exit $script:ExitCode
