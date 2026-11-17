@@ -172,8 +172,7 @@ internal sealed class SettingsWindow : Window
 
         return Page(
             Note("Valem para as barras fora do modo ilha: a caixa junto ao relógio e as barras flutuantes. Quando são uma ilha da barra de tarefas, seguem sempre as cores do Start11."),
-            Card("Tema", "Automático: caixa escura, ou o aspeto do Start11 quando as barras flutuam. Transparente: sem fundo. Seguir o Start11: integradas na barra, sem caixa, e com o aspeto das ilhas quando flutuam.", theme),
-            IslandsBadge(),
+            Card("Tema", "Automático: caixa escura, ou o aspeto do Start11 quando as barras flutuam. Transparente: sem fundo. Seguir o Start11: integradas na barra, sem caixa, e com o aspeto das ilhas quando flutuam.", theme, IslandsBadge()),
             opacityCard,
             Card("Contorno", "Linha à volta da caixa. A cor escolhe-se em Cores.", outline),
             Card("Cantos automáticos", "Seguem o Start11 quando as barras flutuam e são retos na caixa junto ao relógio.", automatic),
@@ -309,7 +308,6 @@ internal sealed class SettingsWindow : Window
             BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(6),
             Padding = new Thickness(14, 10),
-            Margin = new Thickness(0, -1, 0, 0),
             Child = row,
             IsVisible = Start11Theme.IslandsStyle(),
         };
@@ -327,7 +325,8 @@ internal sealed class SettingsWindow : Window
         Margin = new Thickness(2, 0, 0, 8),
     };
 
-    private static Border Card(string title, string? description, Control control)
+    /// <param name="footer">Shown inside the card, under the title and the control, across its full width.</param>
+    private static Border Card(string title, string? description, Control control, Control? footer = null)
     {
         var text = new StackPanel { Spacing = 2, VerticalAlignment = VerticalAlignment.Center };
         text.Children.Add(new TextBlock { Text = title, Foreground = TitleText, FontWeight = FontWeight.SemiBold });
@@ -341,6 +340,15 @@ internal sealed class SettingsWindow : Window
         Grid.SetColumn(control, 1);
         grid.Children.Add(text);
         grid.Children.Add(control);
+        if (footer is not null)
+        {
+            grid.RowDefinitions = new RowDefinitions("Auto,Auto");
+            footer.Margin = new Thickness(0, 12, 0, 0);
+            Grid.SetRow(footer, 1);
+            Grid.SetColumnSpan(footer, 2);
+            grid.Children.Add(footer);
+        }
+
         return new Border
         {
             Background = CardFill,
