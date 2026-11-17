@@ -173,6 +173,7 @@ internal sealed class SettingsWindow : Window
         return Page(
             Note("Valem para as barras fora do modo ilha: a caixa junto ao relógio e as barras flutuantes. Quando são uma ilha da barra de tarefas, seguem sempre as cores do Start11."),
             Card("Tema", "Automático: caixa escura, ou o aspeto do Start11 quando as barras flutuam. Transparente: sem fundo. Seguir o Start11: integradas na barra, sem caixa, e com o aspeto das ilhas quando flutuam.", theme),
+            IslandsBadge(),
             opacityCard,
             Card("Contorno", "Linha à volta da caixa. A cor escolhe-se em Cores.", outline),
             Card("Cantos automáticos", "Seguem o Start11 quando as barras flutuam e são retos na caixa junto ao relógio.", automatic),
@@ -262,6 +263,60 @@ internal sealed class SettingsWindow : Window
         foreach (var card in cards)
             panel.Children.Add(card);
         return panel;
+    }
+
+    /// <summary>
+    /// A badge under a card saying the setting above only shows with another Start11 configuration.
+    /// Start11 can be changed while this window is open, so it is checked again when the window is activated.
+    /// </summary>
+    private Control IslandsBadge()
+    {
+        var icon = new Border
+        {
+            Width = 20,
+            Height = 20,
+            CornerRadius = new CornerRadius(10),
+            Background = Solid("#4C9AFF"),
+            VerticalAlignment = VerticalAlignment.Top,
+            Child = new TextBlock
+            {
+                Text = "i",
+                FontWeight = FontWeight.Bold,
+                FontSize = 12,
+                Foreground = Solid("#0B1F36"),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+            },
+        };
+        var text = new StackPanel { Spacing = 2 };
+        text.Children.Add(new TextBlock { Text = "O Start11 está no estilo Ilhas", Foreground = TitleText, FontWeight = FontWeight.SemiBold });
+        text.Children.Add(new TextBlock
+        {
+            Text = "Aqui o tema só se vê quando as barras flutuam. Para o ver sempre, muda o estilo da barra de tarefas no Start11 para Arredondado ou Sólido.",
+            Foreground = SecondaryText,
+            FontSize = 12,
+            TextWrapping = TextWrapping.Wrap,
+        });
+        var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };
+        row.Children.Add(icon);
+        row.Children.Add(text);
+        text.MaxWidth = 520;
+
+        var badge = new Border
+        {
+            Background = Solid("#1B2B3F"),
+            BorderBrush = Solid("#334C6E"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(6),
+            Padding = new Thickness(14, 10),
+            Margin = new Thickness(0, -1, 0, 0),
+            Child = row,
+            IsVisible = Start11Theme.IslandsStyle(),
+        };
+        EventHandler refresh = (_, _) => badge.IsVisible = Start11Theme.IslandsStyle();
+        Activated += refresh;
+        badge.DetachedFromVisualTree += (_, _) => Activated -= refresh;
+        return badge;
     }
 
     private static Control Note(string text) => new TextBlock
