@@ -15,7 +15,7 @@ public enum BarTheme
     /// <summary>No fill at all: only the text and the bars over what is behind.</summary>
     Transparent,
 
-    /// <summary>The fill and outline colours chosen in Start11.</summary>
+    /// <summary>As part of the Start11 taskbar: no box in the plain bar, the island look while floating.</summary>
     Start11,
 }
 

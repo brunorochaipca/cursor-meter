@@ -63,7 +63,7 @@ Com muitas janelas abertas, a ilha dos ícones do Start11 cresce para a esquerda
 
 Botão direito nas barras ou no ícone da área de notificação, **Definições…**. A janela é parecida com a do Start11: secções à esquerda, um cartão por definição e, em cima, uma pré-visualização das barras que acompanha cada alteração. Tudo se aplica logo e fica em `%LOCALAPPDATA%\CursorMeter\settings.txt`.
 
-- **Aspeto:** tema (Automático, Escuro, **Transparente** ou Seguir o Start11), opacidade do fundo, contorno, cantos, tamanho do texto, mostrar uma só pool e mostrar o que resta em vez do que usaste.
+- **Aspeto:** tema (Automático, Escuro, **Transparente** ou Seguir o Start11, que no estilo Arredondado ou Sólido deixa as barras diretamente na barra, sem caixa), opacidade do fundo, contorno, cantos, tamanho do texto, mostrar uma só pool e mostrar o que resta em vez do que usaste.
 - **Cores:** texto, texto secundário, as duas pools, aviso, crítico e contorno. Para o tema transparente, escolhe um texto claro ou escuro conforme a tua barra de tarefas.
 - **Utilização e alertas:** de quanto em quanto tempo lê a quota (1, 3, 5 ou 10 minutos) e a partir de que valor a barra passa a aviso (70% por omissão) e a crítico (90%).
 - **Barras flutuantes:** opacidade em repouso, esconder e repor a posição.

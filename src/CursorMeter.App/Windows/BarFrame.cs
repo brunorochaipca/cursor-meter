@@ -48,14 +48,19 @@ internal sealed record BarFrame(
         Color fill;
         Color? outline;
         double width = 1;
-        if (theme == BarTheme.Start11)
+        if (theme == BarTheme.Start11 && island is null)
         {
-            var look = island ?? Start11Theme.Look(0);
-            fill = look.Fill;
-            outline = look.Outline;
-            width = look.OutlineWidth;
-            if (island is null)
-                inset = Math.Max(0.5, width / 2);
+            // In the plain box the bars sit on the one bar Start11 draws (solid or rounded), which already
+            // has its colour and outline. A square box with that outline inside a rounded bar looks wrong,
+            // so the bars are drawn straight onto it, with no box of their own.
+            fill = Colors.Transparent;
+            outline = null;
+        }
+        else if (theme == BarTheme.Start11)
+        {
+            fill = island!.Fill;
+            outline = island.Outline;
+            width = island.OutlineWidth;
         }
         else
         {

@@ -172,7 +172,7 @@ internal sealed class SettingsWindow : Window
 
         return Page(
             Note("Valem para as barras fora do modo ilha: a caixa junto ao relógio e as barras flutuantes. Quando são uma ilha da barra de tarefas, seguem sempre as cores do Start11."),
-            Card("Tema", "Automático: caixa escura, ou o aspeto do Start11 quando as barras flutuam. Transparente: sem fundo.", theme),
+            Card("Tema", "Automático: caixa escura, ou o aspeto do Start11 quando as barras flutuam. Transparente: sem fundo. Seguir o Start11: integradas na barra, sem caixa, e com o aspeto das ilhas quando flutuam.", theme),
             opacityCard,
             Card("Contorno", "Linha à volta da caixa. A cor escolhe-se em Cores.", outline),
             Card("Cantos automáticos", "Seguem o Start11 quando as barras flutuam e são retos na caixa junto ao relógio.", automatic),
