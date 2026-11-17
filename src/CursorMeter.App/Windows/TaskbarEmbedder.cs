@@ -16,13 +16,18 @@ namespace CursorMeter.App.Windows;
 /// click, or a taskbar replacement such as Start11, can also raise the taskbar above the
 /// bars without moving it, so the order is checked on every placement and on a short timer.
 /// When Start11 cuts the taskbar into islands, the bars become a fixed island of their own
-/// on the left, where nothing covers them.
+/// on the left, where nothing covers them. When the apps island has grown over that room,
+/// the bars float above the taskbar instead, in the same look but faded, and can be dragged
+/// anywhere on screen or hidden.
 /// </summary>
 internal sealed class TaskbarEmbedder : IDisposable
 {
     private const uint EventObjectCreate = 0x8000;
     private const uint EventObjectLocationChange = 0x800B;
     private const string XamlBridgeClass = "Windows.UI.Composition.DesktopWindowContentBridge";
+
+    /// <summary>Extra room, at 96 DPI, that floating bars ask for before going back on the island.</summary>
+    private const int FloatHysteresis = 16;
 
     private readonly WidgetWindow _widget;
     private readonly NativeMethods.WinEventDelegate _onTaskbarEvent;
@@ -35,6 +40,7 @@ internal sealed class TaskbarEmbedder : IDisposable
     private bool _placeQueued;
     private bool _lifted;
     private bool _onIsland;
+    private bool _floating;
     private bool _holeOpen;
     private PxRect _holeSlot;
 
@@ -49,8 +55,12 @@ internal sealed class TaskbarEmbedder : IDisposable
         // taskbar above the bars without moving it, so no taskbar event reports it.
         _orderTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
         _orderTimer.Tick += (_, _) => OnOrderTick();
+        FloatingSettings.Changed += OnFloatingSettingsChanged;
         WatchTaskbar();
     }
+
+    private void OnFloatingSettingsChanged(object? sender, EventArgs e) =>
+        Dispatcher.UIThread.Post(() => Place());
 
     public bool Embedded { get; private set; }
 
@@ -89,8 +99,20 @@ internal sealed class TaskbarEmbedder : IDisposable
         var edge = TaskbarLayout.DetectEdge(taskbarPx, monitor);
         int dpi = DpiOf(taskbar);
         int width = TaskbarLayout.Scale(TaskbarLayout.PreferredWidth, dpi);
-        var island = overlay ? FindIsland(taskbar, taskbarPx, edge, dpi) : null;
+        // The cut this app makes in the taskbar for Start looks like islands too, so it is not read.
+        NoRoom? noRoom = null;
+        var island = overlay && !_holeOpen
+            ? FindIsland(taskbar, taskbarPx, edge, dpi, _floating ? TaskbarLayout.Scale(FloatHysteresis, dpi) : 0, out noRoom)
+            : null;
         _onIsland = island is not null;
+        if (noRoom is not null)
+        {
+            PlaceFloating(taskbar, taskbarPx, monitor, edge, dpi, noRoom);
+            return;
+        }
+
+        _floating = false;
+        _widget.Floating = false;
         _widget.ShowIsland(island?.Look);
         if (island is { } onIsland)
         {
@@ -143,8 +165,44 @@ internal sealed class TaskbarEmbedder : IDisposable
         }
     }
 
+    /// <summary>
+    /// The taskbar is islands and the apps island leaves no room: the bars float above the taskbar
+    /// in the same island look, faded until the pointer is over them, wherever the user drops them.
+    /// </summary>
+    private void PlaceFloating(IntPtr taskbar, PxRect taskbarPx, PxRect monitor, BarEdge edge, int dpi, NoRoom noRoom)
+    {
+        ReleaseHole(taskbar);
+        _floating = true;
+        _onIsland = false;
+        _widget.ShowIsland(noRoom.Look);
+        _widget.Floating = true;
+        string reason = $"no room for the island ({noRoom.Room}px), radius {noRoom.Look.Radius:0.#}, dpi {dpi}";
+        if (FloatingSettings.State.Hidden)
+        {
+            Mode($"floating above the taskbar, hidden by the user, {reason}");
+            HoldHidden();
+            return;
+        }
+
+        int margin = noRoom.Look.Margin;
+        int width = TaskbarLayout.Scale(TaskbarLayout.PreferredWidth, dpi) + (2 * margin);
+        int height = noRoom.Height + (2 * margin);
+        var home = FloatingBars.DefaultSlot(
+            taskbarPx, monitor, edge, noRoom.EdgeMargin - margin, width, height, TaskbarLayout.Scale(FloatingBars.Gap, dpi));
+        var slot = FloatingBars.Resolve(FloatingSettings.State, home, Monitors());
+        Mode($"floating above the taskbar, {reason}");
+        DockOver(slot, lifted: false);
+    }
+
     public void DragTo(int screenLeft, int screenTop)
     {
+        if (_floating)
+        {
+            FloatingSettings.SetPosition(screenLeft, screenTop);
+            Place();
+            return;
+        }
+
         if (_onIsland)
             return;
 
@@ -168,6 +226,7 @@ internal sealed class TaskbarEmbedder : IDisposable
 
     public void Dispose()
     {
+        FloatingSettings.Changed -= OnFloatingSettingsChanged;
         ReleaseHole(NativeMethods.FindWindow("Shell_TrayWnd", null));
         _settleTimer.Stop();
         _orderTimer.Stop();
@@ -246,7 +305,8 @@ internal sealed class TaskbarEmbedder : IDisposable
         // Task View moves the taskbar into a band above the bars and, with Start11, leaves it
         // there after it closes. No topmost window can sit over a taskbar in a higher band.
         // An island sits outside the taskbar's region, so the band does not hide it.
-        if (!_onIsland && TaskbarInOtherBand(taskbar))
+        // Floating bars are clear of the taskbar as well.
+        if (!_onIsland && !_floating && TaskbarInOtherBand(taskbar))
         {
             Place();
             return;
@@ -617,6 +677,8 @@ internal sealed class TaskbarEmbedder : IDisposable
         ReleaseHole(NativeMethods.FindWindow("Shell_TrayWnd", null));
         Mode("no taskbar found, floating in the screen corner");
         _onIsland = false;
+        _floating = false;
+        _widget.Floating = false;
         _widget.ShowIsland(null);
         Embedded = _widget.Embedded = false;
         _widget.PinTopmost = true;
@@ -671,21 +733,55 @@ internal sealed class TaskbarEmbedder : IDisposable
 
     private static PxRect ToPx(NativeMethods.Rect rect) => new(rect.Left, rect.Top, rect.Right, rect.Bottom);
 
-    private static (PxRect Slot, IslandLook Look)? FindIsland(IntPtr taskbar, PxRect taskbarPx, BarEdge edge, int dpi)
+    /// <summary>The bounds of every screen, in screen pixels.</summary>
+    private static List<PxRect> Monitors()
     {
+        var screens = new List<PxRect>();
+        NativeMethods.MonitorEnumProc collect = (IntPtr monitor, IntPtr dc, ref NativeMethods.Rect rect, IntPtr data) =>
+        {
+            screens.Add(ToPx(rect));
+            return true;
+        };
+        NativeMethods.EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero, collect, IntPtr.Zero);
+        GC.KeepAlive(collect);
+        return screens;
+    }
+
+    /// <summary>An islands taskbar with no room for the bars: how they should look while floating.</summary>
+    private sealed record NoRoom(IslandLook Look, int Height, int EdgeMargin, int Room);
+
+    /// <summary>
+    /// The slot for the bars as an island of their own. When the taskbar is made of islands but
+    /// the apps island leaves no room, null is returned and <paramref name="noRoom"/> says how
+    /// the bars should look when floating instead. <paramref name="extra"/> widens the room the
+    /// bars ask for, so floating bars do not flip back and forth as the apps island grows.
+    /// </summary>
+    private static (PxRect Slot, IslandLook Look)? FindIsland(IntPtr taskbar, PxRect taskbarPx, BarEdge edge, int dpi, int extra, out NoRoom? noRoom)
+    {
+        noRoom = null;
         if (edge is not (BarEdge.Bottom or BarEdge.Top))
             return null;
 
         var islands = TaskbarIslands.FromRegion(RegionRects(taskbar));
+        if (islands.Count == 0)
+            return null;
+
+        var look = Start11Theme.Look(TaskbarIslands.CornerRadius(islands[0].Corner)).At(dpi);
         var slot = TaskbarIslands.LeftSlot(
             taskbarPx,
             islands,
             TaskbarLayout.Scale(TaskbarLayout.PreferredWidth, dpi),
-            TaskbarLayout.Scale(160, dpi));
+            TaskbarLayout.Scale(160, dpi) + extra);
         if (slot.IsEmpty)
+        {
+            noRoom = new NoRoom(
+                look,
+                islands[0].Bounds.Height,
+                Math.Max(0, taskbarPx.Width - islands[^1].Bounds.Right),
+                TaskbarIslands.LeftRoom(taskbarPx, islands));
             return null;
+        }
 
-        var look = Start11Theme.Look(TaskbarIslands.CornerRadius(islands[0].Corner)).At(dpi);
         int margin = look.Margin;
         return (new PxRect(slot.Left - margin, slot.Top - margin, slot.Right + margin, slot.Bottom + margin), look);
     }

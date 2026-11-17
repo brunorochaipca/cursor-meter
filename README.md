@@ -40,6 +40,15 @@ A ilha:
 
 Testado com o Start11 v3 beta, no Windows 11, a 125% de zoom, com a barra em baixo. A barra no topo ou vertical não usa o modo ilha.
 
+### Quando a ilha das janelas ocupa o espaço
+
+Com muitas janelas abertas, a ilha dos ícones do Start11 cresce para a esquerda e deixa de haver espaço para a ilha das barras. Em vez de ficarem por cima dos ícones, as barras **flutuam por cima da barra de tarefas**, no canto esquerdo, mantendo o aspeto de ilha:
+
+- **Esbatidas.** Ficam a cerca de 40% de opacidade e só ficam totalmente visíveis quando o rato passa por cima, para tapar o menos possível.
+- **Arrastáveis.** Aqui podem-se arrastar para qualquer ponto do ecrã, também para outro monitor. A posição fica em `%LOCALAPPDATA%\CursorMeter\floating.txt`. Se esse monitor desaparecer, voltam ao canto esquerdo.
+- **Escondíveis.** No menu (botão direito nas barras ou no ícone da área de notificação), "Esconder as barras flutuantes". Só vale enquanto não houver espaço para a ilha.
+- **Voltam sozinhas.** Quando fechas janelas e a ilha volta a caber, as barras regressam ao canto da barra de tarefas. Pedem uns pixéis a mais para voltar do que para sair, para não oscilarem.
+
 ### Sem o Start11 v3, ou sem ilhas
 
 A aplicação continua a funcionar, com o comportamento anterior. Se as ilhas estiverem desligadas, se o Start11 não estiver instalado, ou se a primeira ilha começar encostada à esquerda e não houver espaço (alinhamento à esquerda), as barras aparecem numa caixa ao lado da área de notificação, junto ao relógio.

@@ -70,6 +70,34 @@ public sealed class TaskbarIslandsTests
     }
 
     [Fact]
+    public void LeftRoom_is_what_is_free_between_the_mirrored_margins()
+    {
+        Assert.Equal(505 - 18, TaskbarIslands.LeftRoom(Taskbar, TaskbarIslands.FromRegion(Region)));
+        Assert.Equal(0, TaskbarIslands.LeftRoom(Taskbar, []));
+        Assert.Equal(0, TaskbarIslands.LeftRoom(Taskbar, [new TaskbarIsland(new PxRect(9, 0, 900, 61), [])]));
+    }
+
+    [Fact]
+    public void LeftSlot_is_empty_when_the_apps_island_grew_over_the_room()
+    {
+        // The apps island of a crowded taskbar reaches 158 px from the left edge: 140 px are free.
+        var islands = TaskbarIslands.FromRegion([new(158, 0, 1423, 61), new(1600, 0, 1911, 61)]);
+
+        Assert.Equal(140, TaskbarIslands.LeftRoom(Taskbar, islands));
+        Assert.True(TaskbarIslands.LeftSlot(Taskbar, islands, 315, 200).IsEmpty);
+    }
+
+    [Fact]
+    public void A_wider_minimum_makes_the_bars_wait_before_returning_to_the_island()
+    {
+        // 210 px free: the bars fit on the island at 200, but a floating bar asks for 216 to come back.
+        var islands = TaskbarIslands.FromRegion([new(228, 0, 1423, 61), new(1600, 0, 1911, 61)]);
+
+        Assert.False(TaskbarIslands.LeftSlot(Taskbar, islands, 315, 200).IsEmpty);
+        Assert.True(TaskbarIslands.LeftSlot(Taskbar, islands, 315, 216).IsEmpty);
+    }
+
+    [Fact]
     public void A_taskbar_without_a_region_has_no_islands()
     {
         Assert.Empty(TaskbarIslands.FromRegion([]));

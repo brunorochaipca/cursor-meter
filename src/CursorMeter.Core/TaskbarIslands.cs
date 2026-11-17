@@ -75,6 +75,19 @@ public static class TaskbarIslands
     }
 
     /// <summary>
+    /// Pixels free to the left of the first island, between the mirrored margins. Windows with many
+    /// open apps grow the apps island towards the left edge and this shrinks to nothing.
+    /// </summary>
+    public static int LeftRoom(PxRect taskbar, IReadOnlyList<TaskbarIsland> islands)
+    {
+        if (islands.Count == 0)
+            return 0;
+
+        int margin = Math.Max(0, taskbar.Width - islands[^1].Bounds.Right);
+        return Math.Max(0, islands[0].Bounds.Left - (2 * margin));
+    }
+
+    /// <summary>
     /// A slot in screen pixels for the bars as one more island, left of the first one, as tall as
     /// it and as far from the left edge as the last island is from the right. Empty without room.
     /// </summary>
