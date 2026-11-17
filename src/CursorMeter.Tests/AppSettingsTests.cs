@@ -32,9 +32,19 @@ public sealed class AppSettingsTests
             FadedOpacity = 25,
             Pools = PoolView.CursorOnly,
             ShowRemaining = true,
+            HideInFullscreen = false,
         };
 
         Assert.Equal(settings, AppSettings.Parse(settings.Format()));
+    }
+
+    [Fact]
+    public void The_bars_hide_in_full_screen_unless_the_user_turns_it_off()
+    {
+        Assert.True(AppSettings.Default.HideInFullscreen);
+        Assert.True(AppSettings.Parse("Theme=Dark").HideInFullscreen);
+        Assert.False(AppSettings.Parse("HideInFullscreen=0").HideInFullscreen);
+        Assert.True(AppSettings.Parse("HideInFullscreen=maybe").HideInFullscreen);
     }
 
     [Fact]

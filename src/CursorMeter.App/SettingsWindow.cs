@@ -247,6 +247,13 @@ internal sealed class SettingsWindow : Window
         var cards = new List<Control>();
         if (_hooks.Startup is { } startup)
             cards.Add(Card(startup.Label, "Abre o CursorMeter quando inicias sessão.", EntryToggle(startup)));
+        if (_bars)
+        {
+            cards.Add(Card(
+                "Esconder em ecrã inteiro",
+                "Esconde as barras enquanto um jogo, um vídeo ou outra aplicação ocupa o ecrã todo e a barra de tarefas desaparece. Voltam quando a aplicação sai do ecrã inteiro.",
+                Toggle(Settings.HideInFullscreen, on => Change(s => s with { HideInFullscreen = on }))));
+        }
         cards.Add(Card("Ficheiro das definições", SettingsStore.FilePath, new TextBlock()));
         cards.Add(ResetButton("Repor todas as definições", () => SettingsStore.Reset()));
         return Page(cards.ToArray());

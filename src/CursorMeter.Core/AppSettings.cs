@@ -67,6 +67,9 @@ public sealed record AppSettings
 
     public PoolView Pools { get; init; } = PoolView.Both;
 
+    /// <summary>Hides the bars while a full-screen application has the screen, as the taskbar does.</summary>
+    public bool HideInFullscreen { get; init; } = true;
+
     /// <summary>Shows what is left of each pool instead of what was used.</summary>
     public bool ShowRemaining { get; init; }
 
@@ -136,6 +139,7 @@ public sealed record AppSettings
             FadedOpacity = Number(values, nameof(FadedOpacity), defaults.FadedOpacity),
             Outline = Flag(values, nameof(Outline), defaults.Outline),
             ShowRemaining = Flag(values, nameof(ShowRemaining), defaults.ShowRemaining),
+            HideInFullscreen = Flag(values, nameof(HideInFullscreen), defaults.HideInFullscreen),
             TextColor = Text(values, nameof(TextColor)),
             MutedColor = Text(values, nameof(MutedColor)),
             CursorColor = Text(values, nameof(CursorColor)),
@@ -163,6 +167,7 @@ public sealed record AppSettings
         Line(nameof(TextScale), s.TextScale);
         Line(nameof(Pools), s.Pools);
         Line(nameof(ShowRemaining), s.ShowRemaining ? 1 : 0);
+        Line(nameof(HideInFullscreen), s.HideInFullscreen ? 1 : 0);
         Line(nameof(RefreshMinutes), s.RefreshMinutes);
         Line(nameof(WarnAt), s.WarnAt);
         Line(nameof(HotAt), s.HotAt);

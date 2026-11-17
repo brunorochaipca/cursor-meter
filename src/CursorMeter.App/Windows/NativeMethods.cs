@@ -144,6 +144,10 @@ internal static class NativeMethods
     [DllImport("user32.dll")]
     public static extern int GetSystemMetrics(int index);
 
+    /// <summary>The state Windows uses to hold back notifications: 2 is a full-screen window, 3 a full-screen Direct3D one.</summary>
+    [DllImport("shell32.dll")]
+    public static extern int SHQueryUserNotificationState(out int state);
+
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     public struct NotifyIconData
     {

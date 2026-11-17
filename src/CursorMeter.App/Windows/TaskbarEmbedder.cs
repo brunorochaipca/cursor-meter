@@ -33,6 +33,7 @@ internal sealed class TaskbarEmbedder : IDisposable
     private readonly NativeMethods.WinEventDelegate _onTaskbarEvent;
     private readonly DispatcherTimer _settleTimer;
     private readonly DispatcherTimer _orderTimer;
+    private readonly DispatcherTimer _fullscreenTimer;
     private IntPtr _taskbarHook;
     private uint _hookedThread;
     private int _delta;
@@ -42,6 +43,7 @@ internal sealed class TaskbarEmbedder : IDisposable
     private bool _onIsland;
     private bool _floating;
     private bool _holeOpen;
+    private bool _fullscreen;
     private PxRect _holeSlot;
 
     public TaskbarEmbedder(WidgetWindow widget)
@@ -55,12 +57,44 @@ internal sealed class TaskbarEmbedder : IDisposable
         // taskbar above the bars without moving it, so no taskbar event reports it.
         _orderTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
         _orderTimer.Tick += (_, _) => OnOrderTick();
+        // A full-screen window covers the taskbar and, being topmost, the bars as well. No window
+        // event reports it, so Windows is asked on a short timer.
+        _fullscreenTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
+        _fullscreenTimer.Tick += (_, _) => OnFullscreenTick();
+        _fullscreenTimer.Start();
         FloatingSettings.Changed += OnFloatingSettingsChanged;
+        SettingsStore.Changed += OnSettingsChanged;
         WatchTaskbar();
     }
 
     private void OnFloatingSettingsChanged(object? sender, EventArgs e) =>
         Dispatcher.UIThread.Post(() => Place());
+
+    private void OnSettingsChanged(object? sender, EventArgs e) =>
+        Dispatcher.UIThread.Post(OnFullscreenTick);
+
+    /// <summary>
+    /// True while a full-screen application is in front and the user wants the bars out of its way.
+    /// Windows holds back notifications in the same states, so it is the call that tells a game or a
+    /// full-screen video from a window that is only maximised.
+    /// </summary>
+    private static bool FullscreenAppActive() =>
+        SettingsStore.Current.HideInFullscreen
+        && NativeMethods.SHQueryUserNotificationState(out int state) == 0
+        && state is 2 or 3;
+
+    private void OnFullscreenTick()
+    {
+        if (!_widget.IsAlive)
+            return;
+
+        bool now = FullscreenAppActive();
+        if (now == _fullscreen)
+            return;
+
+        _fullscreen = now;
+        Place();
+    }
 
     public bool Embedded { get; private set; }
 
@@ -74,6 +108,13 @@ internal sealed class TaskbarEmbedder : IDisposable
     {
         if (!_widget.IsAlive)
             return;
+
+        if (_fullscreen)
+        {
+            Mode("full-screen application in front, bars hidden");
+            HoldHidden();
+            return;
+        }
 
         var taskbar = NativeMethods.FindWindow("Shell_TrayWnd", null);
         if (taskbar == IntPtr.Zero || !NativeMethods.GetWindowRect(taskbar, out var taskbarRect))
@@ -227,9 +268,11 @@ internal sealed class TaskbarEmbedder : IDisposable
     public void Dispose()
     {
         FloatingSettings.Changed -= OnFloatingSettingsChanged;
+        SettingsStore.Changed -= OnSettingsChanged;
         ReleaseHole(NativeMethods.FindWindow("Shell_TrayWnd", null));
         _settleTimer.Stop();
         _orderTimer.Stop();
+        _fullscreenTimer.Stop();
         Unhook();
     }
 

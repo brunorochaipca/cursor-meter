@@ -67,7 +67,7 @@ Botão direito nas barras ou no ícone da área de notificação, **Definições
 - **Cores:** texto, texto secundário, as duas pools, aviso, crítico e contorno. Para o tema transparente, escolhe um texto claro ou escuro conforme a tua barra de tarefas.
 - **Utilização e alertas:** de quanto em quanto tempo lê a quota (1, 3, 5 ou 10 minutos) e a partir de que valor a barra passa a aviso (70% por omissão) e a crítico (90%).
 - **Barras flutuantes:** opacidade em repouso, esconder e repor a posição.
-- **Geral:** iniciar com o Windows e repor todas as definições.
+- **Geral:** iniciar com o Windows, esconder as barras em ecrã inteiro (ligado por omissão) e repor todas as definições. Com isto ligado, as barras desaparecem enquanto um jogo, um vídeo ou outra aplicação ocupa o ecrã todo e voltam quando ela sai. A app usa o mesmo estado do Windows que suspende as notificações nessa situação, por isso uma janela só maximizada não conta.
 
 O tema, a opacidade, o contorno e os cantos valem só **fora do modo ilha**: na caixa junto ao relógio, no Windows 10 e quando as barras flutuam. Como ilha da barra de tarefas, as barras seguem sempre as cores do Start11. O tema transparente não foi testado no Windows 10.
 
