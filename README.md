@@ -46,7 +46,7 @@ A aplicação continua a funcionar, com o comportamento anterior. Se as ilhas es
 
 - **Windows 10:** as barras ficam dentro da barra de tarefas.
 - **Windows 11:** o sistema não mostra uma janela metida na barra: à escala de 100% não aparece nada, e à de 125% só aparece porque o Windows a amplia. As barras são desenhadas por cima da barra, no mesmo sítio, e seguem a escala do monitor.
-- **Menu Iniciar e Vista de Tarefas:** com o menu Iniciar do Windows aberto, ou com a Vista de Tarefas, o Windows põe a barra por cima de qualquer janela normal, por isso as barras sobem para imediatamente acima dela e voltam ao sítio quando fecha. Um clique num ícone da barra também não as esconde.
+- **Menu Iniciar e Vista de Tarefas:** com o menu Iniciar do Windows aberto, ou com a Vista de Tarefas, o Windows põe a barra por cima de qualquer janela normal. As barras ficam no mesmo sítio: a área que ocupam deixa de fazer parte da barra enquanto o menu está aberto, e volta ao normal quando fecha. Um clique num ícone da barra também não as esconde.
 - **Posição:** arrasta para reposicionar. Fica em `%LOCALAPPDATA%\CursorMeter\offset.txt`.
 
 Se numa máquina não aparecerem, abre **Acerca de** no menu do botão direito: mostra a versão e o ficheiro de registos (`%LOCALAPPDATA%\CursorMeter\cursormeter.log`), que diz como as barras foram colocadas. O botão **Enviar registos** copia o registo e abre uma issue no GitHub.

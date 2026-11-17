@@ -42,6 +42,9 @@ internal static class NativeMethods
     public const int DwmwaWindowCornerPreference = 33;
     public const int DwmwcpRound = 2;
     public const int SimpleRegion = 2;
+    public const int ComplexRegion = 3;
+    public const int RgnDiff = 4;
+    public const uint DesktopBand = 1;
 
     // Notification area icon.
     public const uint WmTray = 0x8001; // WM_APP + 1
@@ -252,8 +255,14 @@ internal static class NativeMethods
     [DllImport("user32.dll")]
     public static extern int GetWindowRgn(IntPtr hwnd, IntPtr region);
 
+    [DllImport("user32.dll")]
+    public static extern int SetWindowRgn(IntPtr hwnd, IntPtr region, bool redraw);
+
     [DllImport("gdi32.dll")]
     public static extern IntPtr CreateRectRgn(int left, int top, int right, int bottom);
+
+    [DllImport("gdi32.dll")]
+    public static extern int CombineRgn(IntPtr destination, IntPtr source1, IntPtr source2, int mode);
 
     [DllImport("gdi32.dll")]
     public static extern uint GetRegionData(IntPtr region, uint size, IntPtr data);
