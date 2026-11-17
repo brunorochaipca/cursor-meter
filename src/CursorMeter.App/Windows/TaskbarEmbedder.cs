@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Threading;
@@ -10,12 +9,14 @@ namespace CursorMeter.App.Windows;
 /// Windows 10 accepts them as a child of the taskbar. Windows 11 does not present that child:
 /// at 100% the XAML surface covers it and nothing is drawn, while at 125% DPI hosting
 /// happens to scale the same window into view. On Windows 11 the bars are a topmost
-/// window in screen pixels, sized from the taskbar's own DPI. Opening Start lifts the
-/// taskbar into a higher band that covers that window, so the bars step just outside
-/// the bar until the menu closes. A taskbar button click, or a taskbar replacement such as
-/// Start11, can also raise the taskbar above the bars without moving it, so the order is
-/// checked on every placement and on a short timer. When Start11 cuts the taskbar into
-/// islands, the bars become a fixed island of their own on the left, where nothing covers them.
+/// window in screen pixels, sized from the taskbar's own DPI. Opening Start moves the
+/// taskbar into a higher band that covers that window. The bars stay in their slot: that
+/// rectangle is cut out of the taskbar until the menu closes. A taskbar that already has
+/// a region is left unchanged, and the bars step just outside instead. A taskbar button
+/// click, or a taskbar replacement such as Start11, can also raise the taskbar above the
+/// bars without moving it, so the order is checked on every placement and on a short timer.
+/// When Start11 cuts the taskbar into islands, the bars become a fixed island of their own
+/// on the left, where nothing covers them.
 /// </summary>
 internal sealed class TaskbarEmbedder : IDisposable
 {
@@ -34,9 +35,8 @@ internal sealed class TaskbarEmbedder : IDisposable
     private bool _placeQueued;
     private bool _lifted;
     private bool _onIsland;
-    private static uint _menuPid;
-    private static bool _menuVisible;
-    private static readonly NativeMethods.EnumWindowsProc FindMenuWindow = OnFindMenuWindow;
+    private bool _holeOpen;
+    private PxRect _holeSlot;
 
     public TaskbarEmbedder(WidgetWindow widget)
     {
@@ -94,6 +94,7 @@ internal sealed class TaskbarEmbedder : IDisposable
         _widget.ShowIsland(island?.Look);
         if (island is { } onIsland)
         {
+            ReleaseHole(taskbar);
             var look = onIsland.Look;
             Mode($"island, slot {Describe(onIsland.Slot)}, radius {look.Radius:0.#}, outline {look.OutlineWidth:0.##}px, dpi {dpi}");
             DockOver(onIsland.Slot, lifted: false);
@@ -112,10 +113,28 @@ internal sealed class TaskbarEmbedder : IDisposable
 
         if (overlay)
         {
-            bool lift = TaskbarInOtherBand(taskbar) || MenuCoversTaskbar();
-            var slot = lift ? TaskbarLayout.Beside(taskbarPx, screenSlot, edge, monitor) : screenSlot;
-            Mode($"{(lift ? "overlay beside the taskbar" : "overlay on the taskbar")}, no island, slot {Describe(slot)}, dpi {dpi}");
-            DockOver(slot, lift);
+            if (TaskbarRaised(taskbar))
+            {
+                if (HoldInsideTaskbar(taskbar, taskbarPx, screenSlot))
+                {
+                    Mode($"overlay through the taskbar, no island, slot {Describe(screenSlot)}, dpi {dpi}");
+                    DockOver(screenSlot, lifted: false);
+                    ArmLiftWatch(true);
+                }
+                else
+                {
+                    ReleaseHole(taskbar);
+                    var slot = TaskbarLayout.Beside(taskbarPx, screenSlot, edge, monitor);
+                    Mode($"overlay beside the taskbar, no island, slot {Describe(slot)}, dpi {dpi}");
+                    DockOver(slot, lifted: true);
+                }
+            }
+            else
+            {
+                ReleaseHole(taskbar);
+                Mode($"overlay on the taskbar, no island, slot {Describe(screenSlot)}, dpi {dpi}");
+                DockOver(screenSlot, lifted: false);
+            }
         }
         else
         {
@@ -149,6 +168,7 @@ internal sealed class TaskbarEmbedder : IDisposable
 
     public void Dispose()
     {
+        ReleaseHole(NativeMethods.FindWindow("Shell_TrayWnd", null));
         _settleTimer.Stop();
         _orderTimer.Stop();
         Unhook();
@@ -300,56 +320,107 @@ internal sealed class TaskbarEmbedder : IDisposable
         _settleTimer.Start();
     }
 
-    private static bool MenuCoversTaskbar()
+    /// <summary>
+    /// True when the taskbar has left the desktop band. A child inherits that band, so this
+    /// looks at the taskbar only: comparing it with the bars would undo the cut on the next tick.
+    /// </summary>
+    private static bool TaskbarRaised(IntPtr taskbar)
     {
-        // StartMenuExperienceHost stays running after the menu closes, but its window is hidden.
         try
         {
-            var processes = Process.GetProcessesByName("StartMenuExperienceHost");
-            try
-            {
-                foreach (var process in processes)
-                {
-                    if (HasVisibleMenu((uint)process.Id))
-                        return true;
-                }
-            }
-            finally
-            {
-                foreach (var process in processes)
-                    process.Dispose();
-            }
+            return NativeMethods.GetWindowBand(taskbar, out var band) && band != NativeMethods.DesktopBand;
         }
-        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
+        catch (EntryPointNotFoundException)
         {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Cuts the bars' slot out of a rectangular taskbar. The higher band then no longer covers
+    /// those pixels, and the bars stay where they are. A complex region belongs to Start11.
+    /// </summary>
+    private bool HoldInsideTaskbar(IntPtr taskbar, PxRect taskbarPx, PxRect slot)
+    {
+        if (!CanCutTaskbar(taskbar))
+            return false;
+        if (_holeOpen
+            && slot.Left == _holeSlot.Left
+            && slot.Top == _holeSlot.Top
+            && slot.Width == _holeSlot.Width
+            && slot.Height == _holeSlot.Height
+            && RegionKind(taskbar) == NativeMethods.ComplexRegion)
+            return true;
+
+        int left = slot.Left - taskbarPx.Left;
+        int top = slot.Top - taskbarPx.Top;
+        int right = left + slot.Width;
+        int bottom = top + slot.Height;
+        if (left < 0 || top < 0 || right > taskbarPx.Width || bottom > taskbarPx.Height)
+            return false;
+
+        IntPtr window = NativeMethods.CreateRectRgn(0, 0, taskbarPx.Width, taskbarPx.Height);
+        IntPtr gap = NativeMethods.CreateRectRgn(left, top, right, bottom);
+        if (window == IntPtr.Zero || gap == IntPtr.Zero)
+        {
+            if (window != IntPtr.Zero)
+                NativeMethods.DeleteObject(window);
+            if (gap != IntPtr.Zero)
+                NativeMethods.DeleteObject(gap);
+            return false;
         }
 
-        return false;
+        int combined = NativeMethods.CombineRgn(window, window, gap, NativeMethods.RgnDiff);
+        NativeMethods.DeleteObject(gap);
+        if (combined == 0)
+        {
+            NativeMethods.DeleteObject(window);
+            return false;
+        }
+
+        // SetWindowRgn takes ownership of the region when it succeeds.
+        if (NativeMethods.SetWindowRgn(taskbar, window, true) == 0)
+        {
+            NativeMethods.DeleteObject(window);
+            return false;
+        }
+
+        _holeOpen = true;
+        _holeSlot = slot;
+        return true;
     }
 
-    private static bool HasVisibleMenu(uint processId)
+    private bool CanCutTaskbar(IntPtr taskbar)
     {
-        _menuPid = processId;
-        _menuVisible = false;
-        NativeMethods.EnumWindows(FindMenuWindow, IntPtr.Zero);
-        return _menuVisible;
+        if (_holeOpen)
+            return true;
+        int kind = RegionKind(taskbar);
+        return kind == 0 || kind == NativeMethods.SimpleRegion;
     }
 
-    private static bool OnFindMenuWindow(IntPtr hwnd, IntPtr lparam)
+    private static int RegionKind(IntPtr window)
     {
-        NativeMethods.GetWindowThreadProcessId(hwnd, out var pid);
-        if (pid != _menuPid || !NativeMethods.IsWindowVisible(hwnd))
-            return true;
-        // The Start process keeps a cloaked window after the menu closes.
-        if (NativeMethods.DwmGetWindowAttribute(hwnd, NativeMethods.DwmwaCloaked, out var cloaked, sizeof(int)) == 0
-            && cloaked != 0)
-            return true;
-        if (!NativeMethods.GetWindowRect(hwnd, out var rect))
-            return true;
-        if (rect.Right - rect.Left < 80 || rect.Bottom - rect.Top < 80)
-            return true;
-        _menuVisible = true;
-        return false;
+        var probe = NativeMethods.CreateRectRgn(0, 0, 0, 0);
+        if (probe == IntPtr.Zero)
+            return NativeMethods.ComplexRegion;
+        try
+        {
+            return NativeMethods.GetWindowRgn(window, probe);
+        }
+        finally
+        {
+            NativeMethods.DeleteObject(probe);
+        }
+    }
+
+    private void ReleaseHole(IntPtr taskbar)
+    {
+        if (!_holeOpen)
+            return;
+        if (taskbar != IntPtr.Zero)
+            NativeMethods.SetWindowRgn(taskbar, IntPtr.Zero, true);
+        _holeOpen = false;
+        _holeSlot = default;
     }
 
     private void ShowSlot(PxRect slot, bool topmost)
@@ -518,6 +589,7 @@ internal sealed class TaskbarEmbedder : IDisposable
 
     private void HoldHidden()
     {
+        ReleaseHole(NativeMethods.FindWindow("Shell_TrayWnd", null));
         _orderTimer.Stop();
         Embedded = _widget.Embedded = false;
         _widget.PinTopmost = false;
@@ -542,6 +614,7 @@ internal sealed class TaskbarEmbedder : IDisposable
 
     private void DockFallback()
     {
+        ReleaseHole(NativeMethods.FindWindow("Shell_TrayWnd", null));
         Mode("no taskbar found, floating in the screen corner");
         _onIsland = false;
         _widget.ShowIsland(null);
