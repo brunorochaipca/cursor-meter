@@ -12,7 +12,8 @@
       2. O recorte da barra de tarefas (1.2.6) foi mesmo aplicado e foi retirado ao fechar?
          Le GetWindowRgn(Shell_TrayWnd) antes, durante e depois.
       3. Em que modo estao as barras? Le a ultima linha "Placement:" do registo da app:
-         ilha (Start11), corte (1.2.6), ao-lado (1.2.5 ou recurso), normal.
+         ilha (Start11), flutuante (Start11 sem espaco para a ilha), corte (1.2.6),
+         ao-lado (1.2.5 ou recurso), normal.
       4. As barras saltaram para fora da barra? Compara o retangulo da janela.
       5. Com -TesteCrash: o recorte fica na barra se a app morrer com o menu aberto, e a app
          limpa um recorte antigo no arranque?
@@ -46,6 +47,10 @@
     Termina o CursorMeter com o menu aberto para ver se o recorte fica na barra, volta a abri-lo e
     limpa o recorte no fim. Pede confirmacao, a menos que se use -Sim.
 
+.PARAMETER AbrirJanelas
+    Abre N janelas do Bloco de Notas antes do teste e fecha-as no fim. Com o Start11 (e a barra sem agrupar
+    janelas) enchem a ilha dos icones e tiram o espaco da ilha das barras: reproduz o modo flutuante.
+
 .PARAMETER Saida
     Pasta onde guardar o log e as capturas. Por omissao uma pasta nova em %LOCALAPPDATA%\CursorMeter\testes.
 
@@ -68,6 +73,7 @@ param(
     [int]$Segundos = 25,
     [switch]$VistaDeTarefas,
     [switch]$TesteCrash,
+    [int]$AbrirJanelas = 0,
     [switch]$Sim,
     [string]$Etiqueta = '',
     [string]$Saida = '',
@@ -656,6 +662,7 @@ function Get-PlacementLine {
 function Get-ModeName([string]$line) {
     if ([string]::IsNullOrEmpty($line)) { return 'sem-log' }
     if ($line -match 'Placement: island') { return 'ilha' }
+    if ($line -match 'Placement: floating') { return 'flutuante' }
     if ($line -match 'overlay through the taskbar') { return 'corte' }
     if ($line -match 'overlay beside the taskbar') { return 'ao-lado' }
     if ($line -match 'overlay on the taskbar') { return 'normal' }
@@ -824,6 +831,10 @@ function Invoke-Case([string]$name, [string]$kind) {
     Add-Result $name 'antes' 'INFO' ('barras {0}, modo {1}, regiao {2}, Start11 {3}' -f (Get-WidgetText $base), $baseMode, (Get-RegionName $base), $(if ($start11.Count -gt 0) { 'sim' } else { 'nao' }))
     $overlapNote = Get-OverlapWarning $base $baseMode
     if ($overlapNote) { Add-Result $name 'sobreposicao' 'AVISO' $overlapNote }
+    if ($baseMode -eq 'flutuante') {
+        if (-not (Test-OverlapsTaskbar $base)) { Add-Result $name 'flutuante' 'PASSA' ('barras a flutuar fora da barra de tarefas ({0}), sem tapar icones' -f (Get-WidgetText $base)) }
+        else { Add-Result $name 'flutuante' 'AVISO' ('as barras flutuantes estao sobre a barra de tarefas ({0}): foram arrastadas para la, ou ha um erro' -f (Get-WidgetText $base)) }
+    }
     if ($baseMode -eq 'embutido') {
         Add-Result $name 'arranque' 'INCONCLUSIVO' 'as barras estao embutidas na barra (Windows 10). Este teste e para o Windows 11.'
         return
@@ -887,6 +898,10 @@ function Invoke-Case([string]$name, [string]$kind) {
         elseif ($openMode -eq 'ilha') {
             if (-not $moved) { Add-Result $name 'ilha' 'PASSA' 'modo ilha (Start11), barras no mesmo sitio e sem recorte' }
             else { Add-Result $name 'ilha' 'FALHA' ('modo ilha mas as barras mexeram-se: {0} -> {1}' -f (Get-WidgetText $base), (Get-WidgetText $last.Reading)) }
+        }
+        elseif ($openMode -eq 'flutuante') {
+            if (-not $moved) { Add-Result $name 'flutuante' 'PASSA' 'modo flutuante, barras no mesmo sitio e sem recorte' }
+            else { Add-Result $name 'flutuante' 'FALHA' ('modo flutuante mas as barras mexeram-se: {0} -> {1}' -f (Get-WidgetText $base), (Get-WidgetText $last.Reading)) }
         }
         elseif ($openMode -eq 'ao-lado') {
             if ($expectCut) {
@@ -1071,6 +1086,34 @@ function Save-AppLog {
     }
 }
 
+$script:ExtraWindows = @()
+
+# Opens Notepad windows to fill the taskbar. Only the ones started here are closed afterwards.
+function Open-ExtraWindows([int]$count) {
+    $before = @(Get-Process -Name Notepad -ErrorAction SilentlyContinue | ForEach-Object { $_.Id })
+    Write-Host ('A abrir {0} janelas do Bloco de Notas para encher a barra de tarefas...' -f $count)
+    for ($i = 0; $i -lt $count; $i++) {
+        Start-Process -FilePath 'notepad.exe'
+        Start-Sleep -Milliseconds 700
+    }
+    Start-Sleep -Seconds 3
+    $script:ExtraWindows = @(Get-Process -Name Notepad -ErrorAction SilentlyContinue | Where-Object { $before -notcontains $_.Id })
+    Write-Host ('Janelas abertas pelo script: {0}' -f $script:ExtraWindows.Count)
+}
+
+function Close-ExtraWindows {
+    if ($script:ExtraWindows.Count -eq 0) { return }
+    Write-Host ('A fechar as {0} janelas do Bloco de Notas abertas pelo script.' -f $script:ExtraWindows.Count)
+    foreach ($process in $script:ExtraWindows) {
+        try { if (-not $process.HasExited) { [void]$process.CloseMainWindow() } } catch { }
+    }
+    Start-Sleep -Seconds 2
+    foreach ($process in $script:ExtraWindows) {
+        try { if (-not $process.HasExited) { Stop-Process -Id $process.Id -Force } } catch { }
+    }
+    $script:ExtraWindows = @()
+}
+
 function Invoke-Main {
     # The folder comes first so that the log covers the whole run, including the environment.
     $root = Join-Path $env:LOCALAPPDATA 'CursorMeter\testes'
@@ -1098,6 +1141,7 @@ function Invoke-Main {
 
     if ($Observar) { Invoke-Observar; Save-AppLog; return }
 
+    if ($AbrirJanelas -gt 0) { Open-ExtraWindows $AbrirJanelas }
     $environment = Get-Environment
     Write-Environment $environment
     if ($SoAmbiente) { Save-AppLog; return }
@@ -1161,6 +1205,7 @@ try {
     Write-Host ('ERRO: ' + $_.Exception.ToString()) -ForegroundColor Red
     $script:ExitCode = 2
 } finally {
+    try { Close-ExtraWindows } catch { }
     try { Stop-Transcript | Out-Null } catch { }
 }
 exit $script:ExitCode
