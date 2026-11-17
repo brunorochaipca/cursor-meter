@@ -816,6 +816,7 @@ function Invoke-Case([string]$name, [string]$kind) {
             $sim = Compare-Capture $baseBitmap $bitmap
             Add-Result $name 'abrir' 'INCONCLUSIVO' 'a barra nao mudou de camada (comum com Start11): nao da para julgar o recorte nem o modo. Confirma a captura do ecra para ver se o menu abriu.'
             if ($sim -lt 0) { Add-Result $name 'visivel' 'INCONCLUSIVO' 'o tamanho da janela mudou, nao da para comparar as capturas' }
+            elseif ($kind -eq 'vista') { Add-Result $name 'visivel' 'INFO' ('durante a Vista de Tarefas e aceitavel que fiquem tapadas: {0:P0} dos pixeis iguais ao antes' -f $sim) }
             elseif ($sim -ge $LimiarPixeis) { Add-Result $name 'visivel' 'PASSA' ('{0:P0} dos pixeis iguais ao antes, mesmo sem a barra mudar de camada' -f $sim) }
             else { Add-Result $name 'visivel' 'FALHA' ('as barras estao tapadas ou mudaram: {0:P0} dos pixeis iguais ao antes (limiar {1:P0}). Ver {2}' -f $sim, $LimiarPixeis, $Saida) }
             if (-not (Test-SameWidget $base $s)) { Add-Result $name 'posicao' 'FALHA' ('as barras mexeram-se: {0} -> {1}' -f (Get-WidgetText $base), (Get-WidgetText $s)) }
@@ -885,7 +886,12 @@ function Invoke-Case([string]$name, [string]$kind) {
         else {
             $min = ($sims | Measure-Object -Minimum).Minimum
             $text = ('{0:P0} dos pixeis iguais ao antes (limiar {1:P0}), capturas em {2}' -f $min, $LimiarPixeis, $Saida)
-            if ($min -ge $LimiarPixeis) { Add-Result $name 'visivel' 'PASSA' $text }
+            if ($kind -eq 'vista') {
+                # Task View covers the whole screen, so the bars being hidden while it is open is accepted.
+                # What counts is that they come back, which is checked after closing.
+                Add-Result $name 'visivel' 'INFO' ('durante a Vista de Tarefas e aceitavel que fiquem tapadas: ' + $text)
+            }
+            elseif ($min -ge $LimiarPixeis) { Add-Result $name 'visivel' 'PASSA' $text }
             else { Add-Result $name 'visivel' 'FALHA' ('as barras nao estao visiveis, ou estao tapadas: ' + $text) }
         }
 
@@ -930,7 +936,9 @@ function Invoke-Case([string]$name, [string]$kind) {
     if ($afterMode -eq $baseMode) { Add-Result $name 'modo' 'PASSA' ('modo de volta a {0}' -f $afterMode) }
     else { Add-Result $name 'modo' 'FALHA' ('o modo nao voltou: antes {0}, depois {1}' -f $baseMode, $afterMode) }
     $simAfter = Compare-Capture $baseBitmap $afterBitmap
-    if ($simAfter -ge 0 -and $simAfter -lt $LimiarPixeis) { Add-Result $name 'visivel-depois' 'FALHA' ('{0:P0} dos pixeis iguais ao antes' -f $simAfter) }
+    if ($simAfter -lt 0) { Add-Result $name 'visivel-depois' 'INCONCLUSIVO' 'o tamanho da janela mudou, nao da para comparar as capturas' }
+    elseif ($simAfter -ge $LimiarPixeis) { Add-Result $name 'visivel-depois' 'PASSA' ('barras visiveis outra vez: {0:P0} dos pixeis iguais ao antes' -f $simAfter) }
+    else { Add-Result $name 'visivel-depois' 'FALHA' ('as barras nao voltaram a aparecer: {0:P0} dos pixeis iguais ao antes (limiar {1:P0})' -f $simAfter, $LimiarPixeis) }
 }
 
 # ---------------------------------------------------------------- crash with the menu open
