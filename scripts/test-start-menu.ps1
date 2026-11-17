@@ -627,6 +627,20 @@ function Test-OverlapsTaskbar($x) {
     return ($x.WidgetL -lt $x.TaskbarR -and $x.WidgetR -gt $x.TaskbarL -and $x.WidgetT -lt $x.TaskbarB -and $x.WidgetB -gt $x.TaskbarT)
 }
 
+# Start11 cuts the taskbar into islands with a window region (box in taskbar coordinates). Bars in the plain
+# overlay mode that sit over that box cover taskbar icons: the island of their own did not fit on the left.
+function Get-OverlapWarning($x, [string]$mode) {
+    if ($mode -ne 'normal' -or -not $x.WidgetFound -or $x.RegionKind -ne 3) { return '' }
+    $left = $x.TaskbarL + $x.RegionL
+    $right = $x.TaskbarL + $x.RegionR
+    $top = $x.TaskbarT + $x.RegionT
+    $bottom = $x.TaskbarT + $x.RegionB
+    if ($x.WidgetL -lt $right -and $x.WidgetR -gt $left -and $x.WidgetT -lt $bottom -and $x.WidgetB -gt $top) {
+        return ('as barras ({0}) estao por cima da regiao do Start11 (x {1} a {2}) e cobrem icones da barra. Provavel falta de espaco a esquerda para a ilha das barras (muitas janelas abertas).' -f (Get-WidgetText $x), $left, $right)
+    }
+    return ''
+}
+
 function Get-PlacementLine {
     if (-not (Test-Path -LiteralPath $LogPath)) { return '' }
     try {
@@ -777,6 +791,8 @@ function Write-Environment($e) {
     Write-Host ('  CursorMeter: {0}' -f $e.App)
     Write-Host ('  Barras     : {0}' -f $e.Barras)
     Write-Host ('  Modo (log) : {0}  {1}' -f $e.Modo, $e.Linha)
+    $overlap = Get-OverlapWarning $e.Raw $e.Modo
+    if ($overlap) { Write-Host ('  AVISO      : ' + $overlap) -ForegroundColor Yellow }
 }
 
 function Send-Open([string]$kind) {
@@ -806,6 +822,8 @@ function Invoke-Case([string]$name, [string]$kind) {
     $expectCut = ($baseMode -eq 'normal') -and ($base.RegionKind -eq 0 -or $base.RegionKind -eq 2)
     $baseBitmap = Save-Capture $base (Join-Path $Saida ('{0}-1-fechado-antes.png' -f $name))
     Add-Result $name 'antes' 'INFO' ('barras {0}, modo {1}, regiao {2}, Start11 {3}' -f (Get-WidgetText $base), $baseMode, (Get-RegionName $base), $(if ($start11.Count -gt 0) { 'sim' } else { 'nao' }))
+    $overlapNote = Get-OverlapWarning $base $baseMode
+    if ($overlapNote) { Add-Result $name 'sobreposicao' 'AVISO' $overlapNote }
     if ($baseMode -eq 'embutido') {
         Add-Result $name 'arranque' 'INCONCLUSIVO' 'as barras estao embutidas na barra (Windows 10). Este teste e para o Windows 11.'
         return
@@ -1068,7 +1086,10 @@ function Invoke-Main {
     Start-Transcript -Path (Join-Path $Saida 'teste.log') -Force | Out-Null
 
     $commit = ''
-    try { $commit = (& git -C $PSScriptRoot rev-parse --short HEAD 2>$null) } catch { }
+    # Only inside a clone: from the unzipped copy git would print an error into the log.
+    if (Test-Path -LiteralPath (Join-Path $PSScriptRoot '..\.git')) {
+        try { $commit = (& git -C $PSScriptRoot rev-parse --short HEAD 2>$null) } catch { }
+    }
     Write-Host ('Teste do menu Iniciar do CursorMeter, {0:yyyy-MM-dd HH:mm:ss}' -f (Get-Date))
     Write-Host ('Script: {0}  commit: {1}' -f $PSCommandPath, $(if ($commit) { $commit } else { '?' }))
     Write-Host ('Argumentos: {0}' -f $(if ($script:BoundArgs.Count) { (($script:BoundArgs.GetEnumerator() | ForEach-Object { if ($_.Value -is [System.Management.Automation.SwitchParameter]) { '-' + $_.Key } else { '-{0} {1}' -f $_.Key, $_.Value } }) -join ' ') } else { '(nenhum)' }))
