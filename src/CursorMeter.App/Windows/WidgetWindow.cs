@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using Avalonia;
+using Avalonia.Animation;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
@@ -19,9 +20,16 @@ internal sealed class WidgetWindow : Window
     private NativeMethods.Point _dragCursor;
     private NativeMethods.Rect _dragWindow;
     private IslandLook? _island;
+    private bool _floating;
+
+    private const double FadedOpacity = 0.4;
 
     public WidgetWindow()
     {
+        _bars.Transitions = new Transitions
+        {
+            new DoubleTransition { Property = OpacityProperty, Duration = TimeSpan.FromMilliseconds(160) },
+        };
         SystemDecorations = SystemDecorations.None;
         CanResize = false;
         ShowInTaskbar = false;
@@ -71,6 +79,22 @@ internal sealed class WidgetWindow : Window
 
     public int ToPixels(double value) => (int)Math.Round(value * RenderScaling);
 
+    /// <summary>
+    /// Set while the bars float above the taskbar because the island has no room: they stay faded
+    /// until the pointer is over them, so they hide as little as possible of what is behind.
+    /// </summary>
+    public bool Floating
+    {
+        get => _floating;
+        set
+        {
+            if (_floating == value)
+                return;
+            _floating = value;
+            UpdateFade();
+        }
+    }
+
     /// <summary>Draws the bars as a rounded island, or as the plain box with <c>null</c>.</summary>
     public void ShowIsland(IslandLook? island)
     {
@@ -117,6 +141,20 @@ internal sealed class WidgetWindow : Window
         }
     }
 
+    protected override void OnPointerEntered(PointerEventArgs e)
+    {
+        base.OnPointerEntered(e);
+        UpdateFade();
+    }
+
+    protected override void OnPointerExited(PointerEventArgs e)
+    {
+        base.OnPointerExited(e);
+        UpdateFade();
+    }
+
+    private void UpdateFade() => _bars.Opacity = !_floating || _dragging || IsPointerOver ? 1 : FadedOpacity;
+
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
         base.OnPointerPressed(e);
@@ -126,6 +164,7 @@ internal sealed class WidgetWindow : Window
         {
             _dragging = true;
             NativeMethods.SetCapture(Handle);
+            UpdateFade();
         }
     }
 
@@ -142,6 +181,7 @@ internal sealed class WidgetWindow : Window
             return;
         _dragging = false;
         NativeMethods.ReleaseCapture();
+        UpdateFade();
         if (!NativeMethods.GetCursorPos(out var cursor))
             return;
         var moved = Math.Abs(cursor.X - _dragCursor.X) + Math.Abs(cursor.Y - _dragCursor.Y);

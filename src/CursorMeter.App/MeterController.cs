@@ -93,7 +93,11 @@ internal sealed class MeterController : IDisposable
         menu.Add(new("Atualizar", () => _ = RefreshAsync()));
         menu.Add(new("Painel do Cursor", OpenDashboard));
         if (OperatingSystem.IsWindows())
+        {
             menu.Add(StartupShortcut.MenuEntry());
+            menu.Add(FloatingSettings.MenuEntry());
+        }
+
         if (OperatingSystem.IsLinux())
             menu.Add(AutostartEntry.MenuEntry());
         menu.Add(null);
