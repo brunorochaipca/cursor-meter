@@ -645,6 +645,20 @@ function Wait-Until([scriptblock]$condition, [int]$milliseconds = 3000) {
     return $false
 }
 
+# Whole primary screen, so a person can see what covers the bars.
+function Save-Screen([string]$path) {
+    $bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+    $bitmap = New-Object System.Drawing.Bitmap -ArgumentList $bounds.Width, $bounds.Height
+    $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+    try {
+        $graphics.CopyFromScreen($bounds.Left, $bounds.Top, 0, 0, $bounds.Size)
+        $bitmap.Save($path, [System.Drawing.Imaging.ImageFormat]::Png)
+    } finally {
+        $graphics.Dispose()
+        $bitmap.Dispose()
+    }
+}
+
 function Save-Capture($x, [string]$path) {
     $width = $x.WidgetR - $x.WidgetL
     $height = $x.WidgetB - $x.WidgetT
@@ -786,11 +800,25 @@ function Invoke-Case([string]$name, [string]$kind) {
 
     $samples = @()
     $opened = $false
+    $noRaise = $false
     try {
         Send-Open $kind
         $opened = Wait-Until { $r = Get-Reading; ($r.TaskbarBand -ne $base.TaskbarBand) -or $r.StartOpen } 3000
         if (-not $opened) {
-            Add-Result $name 'abrir' 'INCONCLUSIVO' 'o menu abriu mas a barra nao mudou de camada (comum com Start11 ou se o atalho foi apanhado por outra app). Nao ha o que testar.'
+            # The taskbar stayed in its band (Start11 draws its own menu). The recut and the mode cannot be
+            # judged, but whether the bars are still visible can: measure it and keep the whole screen.
+            $noRaise = $true
+            $opened = $true
+            Start-Sleep -Milliseconds 1200
+            $s = Get-Reading
+            $bitmap = Save-Capture $s (Join-Path $Saida ('{0}-2-aberto-sem-camada.png' -f $name))
+            Save-Screen (Join-Path $Saida ('{0}-2-aberto-sem-camada-ecra.png' -f $name))
+            $sim = Compare-Capture $baseBitmap $bitmap
+            Add-Result $name 'abrir' 'INCONCLUSIVO' 'a barra nao mudou de camada (comum com Start11): nao da para julgar o recorte nem o modo. Confirma a captura do ecra para ver se o menu abriu.'
+            if ($sim -lt 0) { Add-Result $name 'visivel' 'INCONCLUSIVO' 'o tamanho da janela mudou, nao da para comparar as capturas' }
+            elseif ($sim -ge $LimiarPixeis) { Add-Result $name 'visivel' 'PASSA' ('{0:P0} dos pixeis iguais ao antes, mesmo sem a barra mudar de camada' -f $sim) }
+            else { Add-Result $name 'visivel' 'FALHA' ('as barras estao tapadas ou mudaram: {0:P0} dos pixeis iguais ao antes (limiar {1:P0}). Ver {2}' -f $sim, $LimiarPixeis, $Saida) }
+            if (-not (Test-SameWidget $base $s)) { Add-Result $name 'posicao' 'FALHA' ('as barras mexeram-se: {0} -> {1}' -f (Get-WidgetText $base), (Get-WidgetText $s)) }
             return
         }
 
@@ -800,6 +828,7 @@ function Invoke-Case([string]$name, [string]$kind) {
             $previous = $wait
             $s = Get-Reading
             $bitmap = Save-Capture $s (Join-Path $Saida ('{0}-2-aberto-{1}ms.png' -f $name, $wait))
+            Save-Screen (Join-Path $Saida ('{0}-2-aberto-{1}ms-ecra.png' -f $name, $wait))
             $samples += [pscustomobject]@{ Wait = $wait; Reading = $s; Bitmap = $bitmap; Mode = (Get-ModeName (Get-PlacementLine)) }
             Write-Host ('    +{0,4} ms  camada={1}  menu={2}  barras={3}  regiao={4}' -f $wait, [CursorMeterProbe.Probe]::BandName([uint32]([Math]::Max($s.TaskbarBand, 0))), $s.StartOpen, (Get-WidgetText $s), (Get-RegionName $s))
         }
@@ -868,7 +897,12 @@ function Invoke-Case([string]$name, [string]$kind) {
         }
     }
     finally {
-        if ($opened) {
+        if ($opened -and $noRaise) {
+            # Esc closes whatever opened and does nothing if nothing did. The Windows key would toggle it back open.
+            [CursorMeterProbe.Probe]::KeyTap($VkEsc)
+            Start-Sleep -Milliseconds 800
+        }
+        elseif ($opened) {
             Send-Close $kind
             $closed = Wait-Until { $r = Get-Reading; ($r.TaskbarBand -eq $base.TaskbarBand) -and -not $r.StartOpen } 3000
             if (-not $closed) {
