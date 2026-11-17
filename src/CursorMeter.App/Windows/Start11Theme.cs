@@ -27,6 +27,19 @@ internal static class Start11Theme
 {
     private const string SettingsKey = @"Software\Stardock\Start8\Start8.ini\Start8";
 
+    /// <summary>
+    /// True when the taskbar style chosen in Start11 is islands. The rounded and solid styles also
+    /// leave a window region on the taskbar, but one that is not made of islands.
+    /// </summary>
+    public static bool IslandsStyle()
+    {
+        if (!OperatingSystem.IsWindows())
+            return false;
+
+        using var key = Registry.CurrentUser.OpenSubKey(SettingsKey);
+        return Flag(key, "TaskbarIslands");
+    }
+
     public static IslandLook Look(double radius)
     {
         var fill = Palette.Background.Color;

@@ -40,6 +40,16 @@ A ilha:
 
 Testado com o Start11 v3 beta, no Windows 11, a 125% de zoom, com a barra em baixo. A barra no topo ou vertical não usa o modo ilha.
 
+### Outros alinhamentos do Start11
+
+O Start11 também deixa alinhar os ícones à esquerda ou só os botões ao centro. A ilha das barras procura sempre espaço livre entre as ilhas do Start11, por esta ordem:
+
+- **Tudo ao centro:** canto esquerdo, como acima.
+- **Botões ao centro:** ao lado da ilha do Iniciar, entre ela e a ilha dos botões.
+- **Alinhado à esquerda:** entre a ilha dos ícones e a área de notificação, encostada a esta.
+
+Se o primeiro espaço não chegar, usa o maior que couber. Se nenhum couber, as barras flutuam (ver abaixo). Os estilos Sólido e Arredondado do Start11 não têm ilhas separadas e mantêm o comportamento da 1.2.6.
+
 ### Quando a ilha das janelas ocupa o espaço
 
 Com muitas janelas abertas, a ilha dos ícones do Start11 cresce para a esquerda e deixa de haver espaço para a ilha das barras. Em vez de ficarem por cima dos ícones, as barras **flutuam por cima da barra de tarefas**, no canto esquerdo, mantendo o aspeto de ilha:
@@ -51,7 +61,7 @@ Com muitas janelas abertas, a ilha dos ícones do Start11 cresce para a esquerda
 
 ### Sem o Start11 v3, ou sem ilhas
 
-A aplicação continua a funcionar, com o comportamento anterior. Se as ilhas estiverem desligadas, se o Start11 não estiver instalado, ou se a primeira ilha começar encostada à esquerda e não houver espaço (alinhamento à esquerda), as barras aparecem numa caixa ao lado da área de notificação, junto ao relógio.
+A aplicação continua a funcionar, com o comportamento anterior. Se as ilhas estiverem desligadas (estilo Sólido ou Arredondado), se o Start11 não estiver instalado, ou se não houver espaço, as barras aparecem numa caixa ao lado da área de notificação, junto ao relógio.
 
 - **Windows 10:** as barras ficam dentro da barra de tarefas.
 - **Windows 11:** o sistema não mostra uma janela metida na barra: à escala de 100% não aparece nada, e à de 125% só aparece porque o Windows a amplia. As barras são desenhadas por cima da barra, no mesmo sítio, e seguem a escala do monitor.

@@ -75,35 +75,89 @@ public static class TaskbarIslands
     }
 
     /// <summary>
-    /// Pixels free to the left of the first island, between the mirrored margins. Windows with many
-    /// open apps grow the apps island towards the left edge and this shrinks to nothing.
+    /// True when the region is Start11's islands: at least two, the apps and the tray. The solid
+    /// style is one rectangle and the rounded style is one rounded bar, so neither has islands to
+    /// take a place beside. With the islands style chosen in Start11, one island is also right: when
+    /// the apps island grows until it touches the tray island, Start11 merges them into one.
     /// </summary>
-    public static int LeftRoom(PxRect taskbar, IReadOnlyList<TaskbarIsland> islands)
-    {
-        if (islands.Count == 0)
-            return 0;
-
-        int margin = Math.Max(0, taskbar.Width - islands[^1].Bounds.Right);
-        return Math.Max(0, islands[0].Bounds.Left - (2 * margin));
-    }
+    public static bool AreIslands(IReadOnlyList<TaskbarIsland> islands, bool islandsStyle) =>
+        islands.Count >= 2 || (islandsStyle && islands.Count == 1);
 
     /// <summary>
-    /// A slot in screen pixels for the bars as one more island, left of the first one, as tall as
-    /// it and as far from the left edge as the last island is from the right. Empty without room.
+    /// The stretches of free taskbar the bars could take as one more island, left to right, in
+    /// screen pixels: before the first island and between islands. Each is kept clear of its
+    /// neighbours by the margin the last island has from the right edge. Where the alignment is
+    /// left, the only one is between the apps and the tray island; with the buttons centred there
+    /// is one beside the Start island and one beside the tray; with everything centred, the
+    /// corner before the first island and a narrow one beside the tray.
     /// </summary>
-    public static PxRect LeftSlot(PxRect taskbar, IReadOnlyList<TaskbarIsland> islands, int width, int minWidth)
+    public static IReadOnlyList<TaskbarGap> Gaps(PxRect taskbar, IReadOnlyList<TaskbarIsland> islands)
     {
         if (islands.Count == 0)
-            return default;
+            return [];
 
-        var first = islands[0].Bounds;
-        var last = islands[^1].Bounds;
-        int margin = Math.Max(0, taskbar.Width - last.Right);
+        int margin = Math.Max(0, taskbar.Width - islands[^1].Bounds.Right);
+        int top = taskbar.Top + islands[0].Bounds.Top;
+        int bottom = taskbar.Top + islands[0].Bounds.Bottom;
+        var gaps = new List<TaskbarGap>();
         int left = taskbar.Left + margin;
-        int right = Math.Min(left + width, taskbar.Left + first.Left - margin);
-        if (right - left < minWidth)
-            return default;
+        for (int i = 0; i < islands.Count; i++)
+        {
+            int right = taskbar.Left + islands[i].Bounds.Left - margin;
+            if (right > left)
+            {
+                // The gap before the tray island stays put as apps come and go, so the bars hug the
+                // tray there. Any other gap hugs the island before it, which is the one that stays.
+                var anchor = i == islands.Count - 1 ? GapAnchor.Right : GapAnchor.Left;
+                gaps.Add(new TaskbarGap(new PxRect(left, top, right, bottom), anchor));
+            }
 
-        return new PxRect(left, taskbar.Top + first.Top, right, taskbar.Top + first.Bottom);
+            left = taskbar.Left + islands[i].Bounds.Right + margin;
+        }
+
+        return gaps;
+    }
+
+    /// <summary>The widest free stretch, in pixels. Opening many windows narrows every stretch.</summary>
+    public static int Room(PxRect taskbar, IReadOnlyList<TaskbarIsland> islands) =>
+        Gaps(taskbar, islands).Select(gap => gap.Bounds.Width).DefaultIfEmpty(0).Max();
+
+    /// <summary>
+    /// A slot in screen pixels for the bars as one more island, as tall as the others. It takes the
+    /// first free stretch that holds <paramref name="width"/>; failing that the widest one that is
+    /// at least <paramref name="minWidth"/> wide, shrunk to fit. Empty when no stretch has room.
+    /// </summary>
+    public static PxRect BarsSlot(PxRect taskbar, IReadOnlyList<TaskbarIsland> islands, int width, int minWidth)
+    {
+        TaskbarGap? widest = null;
+        foreach (var gap in Gaps(taskbar, islands))
+        {
+            if (gap.Bounds.Width < minWidth)
+                continue;
+            if (gap.Bounds.Width >= width)
+                return Fit(gap, width);
+            if (widest is null || gap.Bounds.Width > widest.Bounds.Width)
+                widest = gap;
+        }
+
+        return widest is null ? default : Fit(widest, widest.Bounds.Width);
+    }
+
+    private static PxRect Fit(TaskbarGap gap, int width)
+    {
+        var bounds = gap.Bounds;
+        return gap.Anchor == GapAnchor.Right
+            ? new PxRect(bounds.Right - width, bounds.Top, bounds.Right, bounds.Bottom)
+            : new PxRect(bounds.Left, bounds.Top, bounds.Left + width, bounds.Bottom);
     }
 }
+
+/// <summary>Which neighbour of a free stretch the bars stay next to.</summary>
+public enum GapAnchor
+{
+    Left,
+    Right,
+}
+
+/// <summary>A free stretch of the taskbar, in screen pixels.</summary>
+public sealed record TaskbarGap(PxRect Bounds, GapAnchor Anchor);

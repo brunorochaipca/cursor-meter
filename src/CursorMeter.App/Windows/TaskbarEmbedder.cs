@@ -751,8 +751,9 @@ internal sealed class TaskbarEmbedder : IDisposable
     private sealed record NoRoom(IslandLook Look, int Height, int EdgeMargin, int Room);
 
     /// <summary>
-    /// The slot for the bars as an island of their own. When the taskbar is made of islands but
-    /// the apps island leaves no room, null is returned and <paramref name="noRoom"/> says how
+    /// The slot for the bars as an island of their own: the corner before the first island, or
+    /// the free stretch beside the Start or tray island, wherever Start11 aligns its buttons.
+    /// When the taskbar is made of islands but no stretch has room, null is returned and <paramref name="noRoom"/> says how
     /// the bars should look when floating instead. <paramref name="extra"/> widens the room the
     /// bars ask for, so floating bars do not flip back and forth as the apps island grows.
     /// </summary>
@@ -762,12 +763,14 @@ internal sealed class TaskbarEmbedder : IDisposable
         if (edge is not (BarEdge.Bottom or BarEdge.Top))
             return null;
 
+        // The solid and rounded styles of Start11 leave one rectangle or one rounded bar, not islands.
+        // Islands merge into one when the apps reach the tray, which only the chosen style tells apart.
         var islands = TaskbarIslands.FromRegion(RegionRects(taskbar));
-        if (islands.Count == 0)
+        if (!TaskbarIslands.AreIslands(islands, Start11Theme.IslandsStyle()))
             return null;
 
         var look = Start11Theme.Look(TaskbarIslands.CornerRadius(islands[0].Corner)).At(dpi);
-        var slot = TaskbarIslands.LeftSlot(
+        var slot = TaskbarIslands.BarsSlot(
             taskbarPx,
             islands,
             TaskbarLayout.Scale(TaskbarLayout.PreferredWidth, dpi),
@@ -778,7 +781,7 @@ internal sealed class TaskbarEmbedder : IDisposable
                 look,
                 islands[0].Bounds.Height,
                 Math.Max(0, taskbarPx.Width - islands[^1].Bounds.Right),
-                TaskbarIslands.LeftRoom(taskbarPx, islands));
+                TaskbarIslands.Room(taskbarPx, islands));
             return null;
         }
 

@@ -1,4 +1,4 @@
-using Xunit;
+﻿using Xunit;
 
 namespace CursorMeter.Tests;
 
@@ -40,67 +40,168 @@ public sealed class TaskbarIslandsTests
         Assert.Equal(0, TaskbarIslands.CornerRadius([]));
     }
 
+    private static IReadOnlyList<TaskbarIsland> Islands(params PxRect[] bounds) =>
+        bounds.Select(rect => new TaskbarIsland(rect, [])).ToList();
+
     [Fact]
-    public void LeftSlot_mirrors_the_tray_island_margin()
+    public void With_everything_centred_the_bars_take_the_corner_before_the_first_island()
     {
         var islands = TaskbarIslands.FromRegion(Region);
 
-        var slot = TaskbarIslands.LeftSlot(Taskbar, islands, 315, 200);
+        var slot = TaskbarIslands.BarsSlot(Taskbar, islands, 315, 200);
 
         Assert.Equal(new PxRect(9, 1135, 324, 1196), slot);
     }
 
     [Fact]
-    public void LeftSlot_shrinks_to_the_room_before_the_first_island()
+    public void The_slot_shrinks_to_the_room_when_the_stretch_is_narrower_than_the_bars()
     {
         var islands = TaskbarIslands.FromRegion(Region);
 
-        var slot = TaskbarIslands.LeftSlot(Taskbar, islands, 900, 200);
+        var slot = TaskbarIslands.BarsSlot(Taskbar, islands, 900, 200);
 
         Assert.Equal(9, slot.Left);
         Assert.Equal(505 - 9, slot.Right);
     }
 
     [Fact]
-    public void LeftSlot_is_empty_when_the_islands_start_on_the_left()
+    public void With_everything_centred_the_stretch_beside_the_tray_is_too_narrow()
     {
-        var islands = TaskbarIslands.FromRegion([new(9, 0, 900, 61), new(1600, 0, 1911, 61)]);
+        // The real Start11 layout: 177 px between the centred island and the tray island.
+        var gaps = TaskbarIslands.Gaps(Taskbar, TaskbarIslands.FromRegion(Region));
 
-        Assert.True(TaskbarIslands.LeftSlot(Taskbar, islands, 315, 200).IsEmpty);
+        Assert.Equal(2, gaps.Count);
+        Assert.Equal(new TaskbarGap(new PxRect(9, 1135, 496, 1196), GapAnchor.Left), gaps[0]);
+        Assert.Equal(159, gaps[1].Bounds.Width);
+        Assert.Equal(GapAnchor.Right, gaps[1].Anchor);
     }
 
     [Fact]
-    public void LeftRoom_is_what_is_free_between_the_mirrored_margins()
+    public void Aligned_left_the_bars_take_the_stretch_beside_the_tray()
     {
-        Assert.Equal(505 - 18, TaskbarIslands.LeftRoom(Taskbar, TaskbarIslands.FromRegion(Region)));
-        Assert.Equal(0, TaskbarIslands.LeftRoom(Taskbar, []));
-        Assert.Equal(0, TaskbarIslands.LeftRoom(Taskbar, [new TaskbarIsland(new PxRect(9, 0, 900, 61), [])]));
+        // The real Start11 layout aligned left: apps island 10..1125 and tray island 1600..1911.
+        var islands = Islands(new PxRect(10, 0, 1125, 61), new PxRect(1600, 0, 1911, 61));
+
+        var slot = TaskbarIslands.BarsSlot(Taskbar, islands, 315, 200);
+
+        Assert.Equal(new PxRect(1591 - 315, 1135, 1591, 1196), slot);
     }
 
     [Fact]
-    public void LeftSlot_is_empty_when_the_apps_island_grew_over_the_room()
+    public void With_the_buttons_centred_the_bars_take_the_stretch_beside_the_Start_island()
     {
-        // The apps island of a crowded taskbar reaches 158 px from the left edge: 140 px are free.
-        var islands = TaskbarIslands.FromRegion([new(158, 0, 1423, 61), new(1600, 0, 1911, 61)]);
+        // The real layout with three islands: Start 10..145, buttons 560..1361, tray 1600..1911.
+        var islands = Islands(new PxRect(10, 0, 145, 61), new PxRect(560, 0, 1361, 61), new PxRect(1600, 0, 1911, 61));
 
-        Assert.Equal(140, TaskbarIslands.LeftRoom(Taskbar, islands));
-        Assert.True(TaskbarIslands.LeftSlot(Taskbar, islands, 315, 200).IsEmpty);
+        var gaps = TaskbarIslands.Gaps(Taskbar, islands);
+        var slot = TaskbarIslands.BarsSlot(Taskbar, islands, 315, 200);
+
+        Assert.Equal(2, gaps.Count);
+        Assert.Equal(GapAnchor.Left, gaps[0].Anchor);
+        Assert.Equal(GapAnchor.Right, gaps[1].Anchor);
+        Assert.Equal(new PxRect(154, 1135, 154 + 315, 1196), slot);
+    }
+
+    [Fact]
+    public void A_stretch_that_holds_the_bars_is_preferred_to_a_wider_one_that_does_not()
+    {
+        var islands = Islands(new PxRect(10, 0, 145, 61), new PxRect(560, 0, 1361, 61), new PxRect(1600, 0, 1911, 61));
+
+        // 400 px do not fit in either stretch (397 and 221): the widest one is taken, shrunk to fit.
+        var slot = TaskbarIslands.BarsSlot(Taskbar, islands, 400, 200);
+
+        Assert.Equal(new PxRect(154, 1135, 551, 1196), slot);
+    }
+
+    [Fact]
+    public void With_the_buttons_centred_the_bars_move_to_the_tray_when_the_buttons_island_grows()
+    {
+        // The buttons island grew leftwards: 167 px beside Start are too few, 221 beside the tray are enough.
+        var islands = Islands(new PxRect(10, 0, 145, 61), new PxRect(330, 0, 1361, 61), new PxRect(1600, 0, 1911, 61));
+
+        var slot = TaskbarIslands.BarsSlot(Taskbar, islands, 315, 200);
+
+        Assert.Equal(new PxRect(1591 - 221, 1135, 1591, 1196), slot);
+    }
+
+    [Fact]
+    public void Without_a_free_stretch_there_is_no_slot_and_the_room_says_how_little_is_left()
+    {
+        // The apps island of a crowded taskbar reaches almost the tray: 132 px are free.
+        var islands = Islands(new PxRect(10, 0, 1450, 61), new PxRect(1600, 0, 1911, 61));
+
+        Assert.Equal(132, TaskbarIslands.Room(Taskbar, islands));
+        Assert.True(TaskbarIslands.BarsSlot(Taskbar, islands, 315, 200).IsEmpty);
     }
 
     [Fact]
     public void A_wider_minimum_makes_the_bars_wait_before_returning_to_the_island()
     {
-        // 210 px free: the bars fit on the island at 200, but a floating bar asks for 216 to come back.
-        var islands = TaskbarIslands.FromRegion([new(228, 0, 1423, 61), new(1600, 0, 1911, 61)]);
+        // 210 px free: the bars fit on the island at 200, but floating bars ask for 216 to come back.
+        var islands = Islands(new PxRect(10, 0, 1372, 61), new PxRect(1600, 0, 1911, 61));
 
-        Assert.False(TaskbarIslands.LeftSlot(Taskbar, islands, 315, 200).IsEmpty);
-        Assert.True(TaskbarIslands.LeftSlot(Taskbar, islands, 315, 216).IsEmpty);
+        Assert.False(TaskbarIslands.BarsSlot(Taskbar, islands, 315, 200).IsEmpty);
+        Assert.True(TaskbarIslands.BarsSlot(Taskbar, islands, 315, 216).IsEmpty);
+    }
+
+    [Fact]
+    public void The_solid_style_is_one_rectangle_and_not_islands()
+    {
+        // Start11 with the solid style: a simple region covering the whole taskbar.
+        var islands = TaskbarIslands.FromRegion([new PxRect(0, 0, 1920, 60)]);
+
+        Assert.False(TaskbarIslands.AreIslands(islands, islandsStyle: false));
+        Assert.Empty(TaskbarIslands.Gaps(Taskbar, islands));
+        Assert.True(TaskbarIslands.BarsSlot(Taskbar, islands, 315, 200).IsEmpty);
+    }
+
+    [Fact]
+    public void The_rounded_style_is_one_island_and_not_islands()
+    {
+        // Start11 with the rounded style: one bar with rounded corners, 10..1911 wide.
+        var islands = TaskbarIslands.FromRegion(
+            [new(17, 0, 1904, 1), new(14, 1, 1907, 2), new(12, 2, 1909, 4), new(10, 4, 1911, 57), new(12, 57, 1909, 59), new(17, 59, 1904, 61)]);
+
+        Assert.Single(islands);
+        Assert.False(TaskbarIslands.AreIslands(islands, islandsStyle: false));
+        Assert.True(TaskbarIslands.BarsSlot(Taskbar, islands, 315, 200).IsEmpty);
+    }
+
+    [Fact]
+    public void Islands_that_merged_into_one_are_still_islands_with_the_islands_style()
+    {
+        // The apps island grew until it touched the tray island and Start11 merged them: 10..1911.
+        // Only the style chosen in Start11 tells that from the rounded style, which looks the same.
+        var islands = TaskbarIslands.FromRegion(
+            [new(17, 0, 1904, 1), new(14, 1, 1907, 2), new(12, 2, 1909, 4), new(10, 4, 1911, 57), new(12, 57, 1909, 59), new(17, 59, 1904, 61)]);
+
+        Assert.True(TaskbarIslands.AreIslands(islands, islandsStyle: true));
+        Assert.Equal(0, TaskbarIslands.Room(Taskbar, islands));
+        Assert.True(TaskbarIslands.BarsSlot(Taskbar, islands, 315, 200).IsEmpty);
+    }
+
+    [Fact]
+    public void Two_islands_are_islands_whatever_the_style_says()
+    {
+        var islands = TaskbarIslands.FromRegion(Region);
+
+        Assert.True(TaskbarIslands.AreIslands(islands, islandsStyle: false));
+        Assert.True(TaskbarIslands.AreIslands(islands, islandsStyle: true));
+        Assert.False(TaskbarIslands.AreIslands([], islandsStyle: true));
+    }
+
+    [Fact]
+    public void Room_is_the_widest_free_stretch()
+    {
+        Assert.Equal(505 - 18, TaskbarIslands.Room(Taskbar, TaskbarIslands.FromRegion(Region)));
+        Assert.Equal(0, TaskbarIslands.Room(Taskbar, []));
     }
 
     [Fact]
     public void A_taskbar_without_a_region_has_no_islands()
     {
         Assert.Empty(TaskbarIslands.FromRegion([]));
-        Assert.True(TaskbarIslands.LeftSlot(Taskbar, [], 315, 200).IsEmpty);
+        Assert.True(TaskbarIslands.BarsSlot(Taskbar, [], 315, 200).IsEmpty);
     }
 }
+
