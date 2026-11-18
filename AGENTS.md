@@ -1,6 +1,13 @@
 # Instruções para agentes
 
-## Antes de mexer em código: confirma a edição
+## PRIMEIRO PASSO OBRIGATÓRIO: confirma a edição
+
+**Antes de qualquer outra ação** (ler ficheiros, pesquisar, investigar, correr comandos, editar), pergunta ao programador em qual das edições quer trabalhar. Isto aplica-se a **todas** as tarefas sobre este projeto: bugs, investigação, revisão, versões, README, instalador ou código. Só se dispensa a pergunta em conversas que não tocam no projeto.
+
+1. Corre `git branch --show-current` e diz em que pasta e branch estás.
+2. Usa a ferramenta de perguntas com as opções Island, Mainland e "as duas".
+3. Não leias nem pesquises mais nada enquanto não houver resposta.
+4. A resposta vale para o resto da conversa, até o programador mudar de edição. Mesmo assim, mantém a pergunta em cada conversa nova, mesmo que a pasta pareça indicar uma.
 
 Este projeto tem **duas edições** do CursorMeter para Windows, cada uma na sua branch e, normalmente, na sua pasta de trabalho (`git worktree`):
 
@@ -8,8 +15,6 @@ Este projeto tem **duas edições** do CursorMeter para Windows, cada uma na sua
 |---|---|---|---|---|
 | **Island** (estável) | `main` | `cursor-meter-island` | Start11 v3 e barra nativa | `1.3.x` |
 | **Mainland** (beta) | `mainland` | `cursor-meter` | Start11 v1/v2, com modo administrador experimental (UIAccess) | `1.4.0-beta.N` |
-
-**No início de cada tarefa que altere código, scripts, instalador, README ou versões, pergunta ao programador em qual das edições quer trabalhar, mesmo que a pasta atual pareça indicar uma.** Faz a pergunta antes de editar qualquer ficheiro. Usa `git branch --show-current` e o caminho da pasta para dizer em que edição estás agora, e pede confirmação (por exemplo com a ferramenta de perguntas, com as opções Island, Mainland e "as duas").
 
 Se a pasta e a branch não corresponderem à edição pretendida, **não mudes de branch dentro da pasta**. Diz ao programador para abrir a pasta certa (ou propõe criar um `git worktree`).
 
