@@ -66,4 +66,4 @@ A aplicação continua a funcionar, com o comportamento anterior. Se as ilhas es
 
 ## Instalador
 
-Os instaladores não pedem administrador (a Mainland só pede, para registar o arranque, se ativares o modo experimental). O programa fica em `%LOCALAPPDATA%\Programs\CursorMeter`. A posição das barras, quando não estás no modo ilha, continua em `%LOCALAPPDATA%\CursorMeter\offset.txt`, por isso uma reinstalação não a apaga. O mesmo interruptor de arranque com o Windows está no menu do botão direito.
+Os instaladores instalam por utilizador e não pedem administrador por omissão. Na Mainland, o passo **Selecione o modo de instalação** deixa escolher o modo administrador experimental; se o escolheres, o botão Instalar pede elevação. O programa fica em `%LOCALAPPDATA%\Programs\CursorMeter`. A posição das barras, quando não estás no modo ilha, continua em `%LOCALAPPDATA%\CursorMeter\offset.txt`, por isso uma reinstalação não a apaga. O mesmo interruptor de arranque com o Windows está no menu do botão direito.

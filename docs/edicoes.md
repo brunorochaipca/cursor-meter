@@ -15,6 +15,6 @@ Com o Start11 v3 ou sem Start11, a Island. Com o Start11 v1 ou v2, a Mainland: n
 
 ## Instalar uma ou outra
 
-O instalador da Mainland, ao detetar um Start11 anterior ao v3, recomenda instalar com permissão de administrador (modo experimental). O da Island, nesse caso, avisa que a edição não é totalmente compatível e recomenda a Mainland (a partir da próxima versão estável).
+O instalador da Mainland tem um passo para escolher se a instalação pede permissão de administrador. Se detetar um Start11 anterior ao v3, recomenda essa opção e explica porquê. O da Island, nesse caso, avisa que a edição não é totalmente compatível e recomenda a Mainland (a partir da próxima versão estável).
 
 A release traz um instalador de Windows de 64 bits por edição: `CursorMeter-Setup-<versão>.exe` (Island) e `CursorMeter-Mainland-Setup-<versão>.exe` (Mainland, marcada como pré-lançamento). As duas edições usam a mesma pasta e o mesmo registo de instalação: **instalar uma substitui a outra**, e nunca correm as duas ao mesmo tempo. Na Mainland, o ecrã **Acerca de** e o registo mostram a edição.

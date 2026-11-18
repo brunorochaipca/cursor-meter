@@ -4,6 +4,8 @@ using System.Runtime.Versioning;
 using System.Security;
 using System.Security.Principal;
 using System.Text;
+using System.Xml;
+using System.Xml.Linq;
 
 namespace CursorMeter.App.Windows;
 
@@ -17,7 +19,7 @@ internal static class StartupShortcut
         "CursorMeter.lnk");
 
     public static bool IsEnabled => UiAccess.IsConfigured
-        ? IsScheduledTaskEnabled()
+        ? QueryScheduledTask() is { Enabled: true, LogonTriggerEnabled: true }
         : File.Exists(LinkPath);
 
     public static MenuEntry MenuEntry() => new("Iniciar com o Windows", Toggle, () => IsEnabled);
@@ -50,12 +52,13 @@ internal static class StartupShortcut
     }
 
     /// <summary>
-    /// Starts the elevated logon scheduled task when experimental administrator mode is active and
-    /// the user launched <c>CursorMeter.exe</c> from a non-elevated shortcut.
+    /// Starts the elevated scheduled task when experimental administrator mode is active and the
+    /// user launched <c>CursorMeter.exe</c> from a non-elevated shortcut. The task exists even when
+    /// starting with Windows is off (logon trigger disabled), so opening the app needs no UAC prompt.
     /// </summary>
     public static bool TryRunScheduledTask()
     {
-        if (!IsScheduledTaskEnabled())
+        if (QueryScheduledTask() is not { Enabled: true })
             return false;
         return RunSchtasks($"/Run /TN \"{ScheduledTaskName}\"", out _) == 0;
     }
@@ -77,21 +80,47 @@ internal static class StartupShortcut
             File.Delete(LinkPath);
     }
 
-    private static bool IsScheduledTaskEnabled()
+    internal readonly record struct ScheduledTaskState(bool Enabled, bool LogonTriggerEnabled);
+
+    private static ScheduledTaskState? QueryScheduledTask()
     {
         if (RunSchtasks($"/Query /TN \"{ScheduledTaskName}\" /XML", out string xml) != 0)
-            return false;
-        return xml.Contains("<Enabled>true</Enabled>", StringComparison.OrdinalIgnoreCase);
+            return null;
+        return ParseScheduledTask(xml);
     }
 
+    /// <summary>
+    /// Reads the task and logon trigger state from the task XML. Task Scheduler may omit
+    /// <c>Enabled</c> elements that keep their default value (true).
+    /// </summary>
+    internal static ScheduledTaskState? ParseScheduledTask(string xml)
+    {
+        try
+        {
+            var root = XDocument.Parse(xml).Root;
+            if (root is null)
+                return null;
+            var ns = root.Name.Namespace;
+            bool EnabledOf(XElement? parent) =>
+                parent?.Element(ns + "Enabled") is not { } enabled
+                || !string.Equals(enabled.Value.Trim(), "false", StringComparison.OrdinalIgnoreCase);
+
+            bool taskEnabled = EnabledOf(root.Element(ns + "Settings"));
+            var logon = root.Element(ns + "Triggers")?.Element(ns + "LogonTrigger");
+            return new ScheduledTaskState(taskEnabled, logon is not null && EnabledOf(logon));
+        }
+        catch (XmlException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Registers the elevated task. Turning startup off keeps the task with its logon trigger
+    /// disabled, so the app can still start elevated from the task without a UAC prompt.
+    /// </summary>
     private static void SetScheduledTaskEnabled(bool enabled)
     {
-        if (!enabled)
-        {
-            RunSchtasksElevated($"/Delete /TN \"{ScheduledTaskName}\" /F");
-            return;
-        }
-
         string exePath = Environment.ProcessPath
             ?? throw new InvalidOperationException("Caminho do executável indisponível.");
         string workingDir = AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
@@ -104,7 +133,7 @@ internal static class StartupShortcut
             <Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
               <Triggers>
                 <LogonTrigger>
-                  <Enabled>true</Enabled>
+                  <Enabled>{(enabled ? "true" : "false")}</Enabled>
                   <UserId>{userId}</UserId>
                 </LogonTrigger>
               </Triggers>
