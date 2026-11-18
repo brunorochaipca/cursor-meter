@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media;
+using Avalonia.Platform;
 using Avalonia.Threading;
 using CursorMeter.App.Windows;
 
@@ -169,7 +170,14 @@ internal sealed partial class FlyoutWindow : Window
             return;
 
         var scaling = screen.Scaling;
-        var size = PixelSize.FromSize(Bounds.Size, scaling);
+        var computed = PixelSize.FromSize(Bounds.Size, scaling);
+
+        // The size the window really has: Bounds is in device-independent units and the monitor's
+        // scaling is not always the one this window renders with, so a computed height can be taller
+        // than the window and leave a gap between it and the taskbar.
+        var size = ActualSize() ?? computed;
+        _placedSize = size;
+
         var gap = (int)Math.Round(Gap * scaling);
         var area = screen.WorkingArea;
         bool panelOnTop = area.Y > screen.Bounds.Y;
@@ -182,8 +190,78 @@ internal sealed partial class FlyoutWindow : Window
         if (y < area.Y)
             y = bottom + gap;
 
+        var side = _anchor is { } anchor ? VerticalTaskbarSide(screen, anchor) : null;
+        if (side is { } left)
+        {
+            // Taskbar at the left or right of the screen: open beside it, with the bottom edge of the
+            // card level with the bars (they sit above the notification area), not above them.
+            x = left ? area.X + gap : area.Right - size.Width - gap;
+            y = (_anchor?.Bottom ?? area.Bottom) - size.Height;
+        }
+
         x = Math.Clamp(x, area.X, Math.Max(area.X, area.Right - size.Width));
         y = Math.Clamp(y, area.Y, Math.Max(area.Y, area.Bottom - size.Height));
         Position = new PixelPoint(x, y);
+
+        var line = $"Flyout placement: anchor {(_anchor is { } p ? $"{p.X},{p.Y} {p.Width}x{p.Height}" : "none")}, "
+            + $"work area {area.X},{area.Y} {area.Width}x{area.Height}, screen scaling {scaling:0.##}, render scaling {RenderScaling:0.##}, "
+            + $"bounds {Bounds.Width:0.#}x{Bounds.Height:0.#}, computed {computed.Width}x{computed.Height}, window {size.Width}x{size.Height}, "
+            + $"taskbar {(side is { } l ? (l ? "left" : "right") : "horizontal")}, at {x},{y}";
+        if (line != _lastPlacement)
+        {
+            _lastPlacement = line;
+            AppLog.Info(line);
+        }
+
+        // Setting the position raises no layout pass. If the window had not reached its final size yet,
+        // place it again once it has.
+        if (!_settling)
+        {
+            _settling = true;
+            Dispatcher.UIThread.Post(() =>
+            {
+                _settling = false;
+                if (!_closing && ActualSize() is { } now && now != _placedSize)
+                    Reposition();
+            }, DispatcherPriority.Background);
+        }
+    }
+
+    /// <summary>
+    /// True when the taskbar is at the left of the screen, false at the right, null when it is at the
+    /// top or bottom. The working area gives it away: the side that lost the most room is the taskbar's.
+    /// With an auto-hidden taskbar nothing is reserved, so the shape of the bars decides (stacked
+    /// circles are taller than wide) and the nearer screen edge says which side.
+    /// </summary>
+    private static bool? VerticalTaskbarSide(Screen screen, PixelRect anchor)
+    {
+        var bounds = screen.Bounds;
+        var area = screen.WorkingArea;
+        int left = area.X - bounds.X;
+        int right = bounds.Right - area.Right;
+        int vertical = Math.Max(area.Y - bounds.Y, bounds.Bottom - area.Bottom);
+        int side = Math.Max(left, right);
+
+        if (side > 0 || vertical > 0)
+            return side > vertical ? left >= right : null;
+        if (anchor.Height <= anchor.Width)
+            return null;
+        return anchor.X + (anchor.Width / 2) < bounds.X + (bounds.Width / 2);
+    }
+
+    private string? _lastPlacement;
+    private PixelSize? _placedSize;
+    private bool _settling;
+
+    /// <summary>The window's size in pixels as Windows has it, or null off Windows or before it exists.</summary>
+    private PixelSize? ActualSize()
+    {
+        if (!OperatingSystem.IsWindows()
+            || TryGetPlatformHandle()?.Handle is not { } hwnd
+            || !NativeMethods.GetWindowRect(hwnd, out var rect)
+            || rect.Right <= rect.Left
+            || rect.Bottom <= rect.Top)
+            return null;
+        return new PixelSize(rect.Right - rect.Left, rect.Bottom - rect.Top);
     }
 }
