@@ -24,7 +24,8 @@ Se a pasta e a branch não corresponderem à edição pretendida, **não mudes d
 - As correções que valem para as duas fazem-se **primeiro na `main`** e entram na `mainland` com `git merge main`. Nunca ao contrário, e sem `cherry-pick` da `mainland` para a `main`, a menos que o programador peça.
 - Uma tarefa que toca nas duas edições faz-se em dois passos, cada um na sua pasta e com o seu commit. Diz isso ao programador antes de começar.
 - Não alteres nem apagues releases ou etiquetas existentes (`v1.3.1`, `v1.4.0-beta.1`, ...) sem o programador pedir. Cada release aponta para a branch da sua edição.
-- Compila e testa sempre na pasta da edição em que estás a trabalhar (`dotnet test`, `scripts\build-installer.ps1`). Cada pasta tem os seus `bin` e `obj`.
+- Compila e testa sempre na pasta da edição em que estás a trabalhar (`dotnet build`, `dotnet test`). Cada pasta tem os seus `bin` e `obj`.
+- O **instalador** não se gera na pasta da edição, mas na pasta de releases `cursor-meter-rel` (`C:\Users\Bruno\Documents\GitHub\cursor-meter-rel`, um `git worktree` em HEAD destacado), sempre a partir do commit da release. Assim o instalador nunca leva alterações soltas da pasta de trabalho. Gera-se localmente, não há CI. Ver "Publicar uma release".
 - As duas edições partilham o AppId do instalador, o mutex `Local\CursorMeter` e `%LOCALAPPDATA%\CursorMeter`: instalar uma substitui a outra e nunca correm as duas ao mesmo tempo.
 
 ## Publicar uma release
@@ -32,12 +33,16 @@ Se a pasta e a branch não corresponderem à edição pretendida, **não mudes d
 Quando o programador pede para **publicar uma release**, isso inclui **fazer commit e push para a branch da respetiva edição** (`main` para a Island, `mainland` para a Mainland). Não precisa de pedir autorização separada para o commit. Passos, por esta ordem:
 
 1. Confirma a edição (ver acima) e trabalha na pasta dessa edição.
-2. Atualiza a versão (`.csproj` e `app.manifest`), compila, corre os testes e gera o instalador (`scripts\build-installer.ps1`).
+2. Atualiza a versão (`.csproj` e `app.manifest`), compila e corre os testes na pasta da edição.
 3. Faz commit só do que pertence à release e push para a branch da edição. Não incluas ficheiros alheios (por exemplo alterações soltas em `scripts\test-start-menu.ps1`).
-4. Cria a etiqueta e a release no GitHub a apontar para esse commit (`gh release create ... --target <branch>`), com as notas em português e o instalador como anexo:
+4. Gera o instalador na pasta de releases `cursor-meter-rel`:
+   - Confirma que `git -C ..\cursor-meter-rel status --short` está vazio. Se não estiver, pára e pergunta ao programador.
+   - Põe-na no commit da release, sem criar branch: `git -C ..\cursor-meter-rel checkout --detach <branch>` (`main` ou `mainland`). Esta é a única pasta onde se muda de commit.
+   - Corre `scripts\build-installer.ps1` dentro dela. O instalador fica em `cursor-meter-rel\dist\CursorMeter-Setup-<versão>.exe`.
+5. Cria a etiqueta e a release no GitHub a apontar para esse commit (`gh release create ... --target <branch>`), com as notas em português e o instalador de `cursor-meter-rel\dist` como anexo:
    - **Island:** etiqueta `v1.3.x`, release normal, branch `main`.
    - **Mainland:** etiqueta `v1.4.0-beta.N`, `--prerelease --latest=false`, branch `mainland`.
-5. Nas notas, diz o que foi testado e o que não foi.
+6. Nas notas, diz o que foi testado e o que não foi.
 
 Se a versão pedida já existir como release, não a substituas: pergunta ao programador.
 
