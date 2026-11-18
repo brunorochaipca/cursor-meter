@@ -25,7 +25,7 @@ O nome vem das ilhas do Start11 v3. A Island vive nelas. A Mainland é para a ba
 
 **Qual escolher?** Com o Start11 v3 ou sem Start11, a Island. Com o Start11 v1 ou v2, a Mainland: nestas versões, abrir e fechar o menu Iniciar ou a Vista de Tarefas **com o rato** deixa a barra de tarefas por cima das barras do CursorMeter até ao próximo clique (com a tecla do Windows não acontece). O modo administrador experimental resolve isto.
 
-O instalador da Island deteta um Start11 anterior ao v3, avisa que a edição não é totalmente compatível e recomenda a Mainland. O da Mainland, nesse caso, recomenda instalar com permissão de administrador (modo experimental). As duas edições usam a mesma pasta e o mesmo registo de instalação: instalar uma substitui a outra. O ecrã **Acerca de** mostra a edição, e o registo também.
+O instalador da Mainland, ao detetar um Start11 anterior ao v3, recomenda instalar com permissão de administrador (modo experimental). Está previsto o da Island avisar, nesse caso, que a edição não é totalmente compatível e recomendar a Mainland. As duas edições usam a mesma pasta e o mesmo registo de instalação: instalar uma substitui a outra. Na Mainland, o ecrã **Acerca de** e o registo mostram a edição.
 
 ### Modo administrador experimental (Mainland)
 
@@ -34,7 +34,7 @@ O Windows põe a barra de tarefas numa camada acima das janelas normais quando o
 - **Pede permissão de administrador** (UAC) ao iniciar, ou ao instalar se escolheres o arranque com o Windows.
 - **O arranque com o Windows usa uma Tarefa Agendada** (`CursorMeter`, privilégio mais alto) em vez de um atalho, para não pedir o UAC a cada início de sessão.
 - **É experimental.** Se o UIAccess não ficar ativo, a app continua sem ele, como a Island, e o motivo fica no registo.
-- **Só existe na Mainland.** A Island ignora o ficheiro `experimental-admin` e nunca se eleva.
+- **Só existe na Mainland.** A Island não tem este código e nunca se eleva.
 
 O modo ativa-se quando, no instalador, respondes Sim ao aviso do Start11 anterior ao v3. Desinstalar apaga a Tarefa Agendada. Para o desligar sem desinstalar, apaga `experimental-admin` na pasta do programa e a tarefa `CursorMeter` no Agendador de Tarefas.
 
@@ -110,7 +110,7 @@ Se numa máquina não aparecerem, abre **Acerca de** no menu do botão direito: 
 
 ### Instalar
 
-A release traz um instalador para Windows de 64 bits por edição: `CursorMeter-Island-Setup-<versão>.exe` e `CursorMeter-Mainland-Setup-<versão>.exe` (esta marcada como pré-lançamento). Os instaladores não pedem administrador (a Mainland só pede, para registar o arranque, se ativares o modo experimental). O programa fica em `%LOCALAPPDATA%\Programs\CursorMeter` e aparece em Aplicações instaladas. A posição das barras, quando não estás no modo ilha, continua em `%LOCALAPPDATA%\CursorMeter\offset.txt`, por isso uma reinstalação não a apaga.
+A release traz um instalador para Windows de 64 bits por edição: `CursorMeter-Setup-<versão>.exe` (Island) e `CursorMeter-Mainland-Setup-<versão>.exe` (Mainland, marcada como pré-lançamento). Os instaladores não pedem administrador (a Mainland só pede, para registar o arranque, se ativares o modo experimental). O programa fica em `%LOCALAPPDATA%\Programs\CursorMeter` e aparece em Aplicações instaladas. A posição das barras, quando não estás no modo ilha, continua em `%LOCALAPPDATA%\CursorMeter\offset.txt`, por isso uma reinstalação não a apaga.
 
 O Windows pode dizer que o publicador é desconhecido, porque o instalador não está assinado. No assistente podes deixar marcado o arranque com o Windows. O mesmo interruptor está no menu do botão direito.
 
@@ -155,10 +155,14 @@ No Windows, com o [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
 
 ```powershell
 .\scripts\build-windows.ps1
-.\src\CursorMeter.App\bin\Release\net8.0\win-x64\publish-mainland\CursorMeter.exe
 ```
 
-Esta branch (`mainland`) compila a edição Mainland, em `publish-mainland`. O instalador, `dist\CursorMeter-Mainland-Setup-<versão>.exe`, sai de `.\scripts\build-installer.ps1`. A edição Island vive na branch `main`.
+Cada edição vive na sua branch, e cada branch compila só a sua edição:
+
+| Edição | Branch | Executável (em `src\CursorMeter.App\bin\Release\net8.0\win-x64\`) | Instalador (de `.\scripts\build-installer.ps1`) |
+|---|---|---|---|
+| Island | `main` | `publish\CursorMeter.exe` | `dist\CursorMeter-Setup-<versão>.exe` |
+| Mainland | `mainland` | `publish-mainland\CursorMeter.exe` | `dist\CursorMeter-Mainland-Setup-<versão>.exe` |
 
 As barras aparecem na barra de tarefas, como descrito em [Windows](#windows).
 
