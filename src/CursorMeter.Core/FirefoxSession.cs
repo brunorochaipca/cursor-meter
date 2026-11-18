@@ -277,6 +277,8 @@ public static class FirefoxSession
         if (OperatingSystem.IsWindows())
         {
             yield return Path.Combine(appData, "Mozilla", "Firefox", "Profiles");
+            foreach (var root in StoreProfileRoots())
+                yield return root;
             yield break;
         }
 
@@ -285,6 +287,31 @@ public static class FirefoxSession
         yield return Path.Combine(home, "snap", "firefox", "common", ".mozilla", "firefox");
         yield return Path.Combine(home, ".var", "app", "org.mozilla.firefox", ".mozilla", "firefox");
         yield return Path.Combine(appData, "mozilla", "firefox");
+    }
+
+    /// <summary>
+    /// The Microsoft Store build of Firefox is a packaged app: Windows redirects what it writes to
+    /// <c>%APPDATA%</c> into <c>%LOCALAPPDATA%\Packages\Mozilla.Firefox_*\LocalCache\Roaming</c>, so the
+    /// profiles are not under the real <c>%APPDATA%</c>.
+    /// </summary>
+    private static IEnumerable<string> StoreProfileRoots()
+    {
+        var packages = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData, Environment.SpecialFolderOption.DoNotVerify),
+            "Packages");
+        string[] folders;
+        try
+        {
+            if (!Directory.Exists(packages))
+                return [];
+            folders = Directory.GetDirectories(packages, "Mozilla.Firefox*");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return [];
+        }
+
+        return folders.Select(folder => Path.Combine(folder, "LocalCache", "Roaming", "Mozilla", "Firefox", "Profiles"));
     }
 
     private static IEnumerable<string> CookieDatabases()

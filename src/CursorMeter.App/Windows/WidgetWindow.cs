@@ -240,6 +240,14 @@ internal sealed class WidgetWindow : Window
 
     private IntPtr OnWindowMessage(IntPtr hwnd, uint message, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
+        if (message == NativeMethods.WmContextMenu)
+        {
+            // The right button already opened the app's own menu. Left to DefWindowProc, a child window
+            // hands WM_CONTEXTMENU to its parent, so on Windows 10 the taskbar opened its menu as well.
+            handled = true;
+            return IntPtr.Zero;
+        }
+
         if (message != NativeMethods.WmWindowPosChanging || _dragging)
             return IntPtr.Zero;
 

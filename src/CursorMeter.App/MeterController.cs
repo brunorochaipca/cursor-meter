@@ -282,6 +282,7 @@ internal sealed class MeterController : IDisposable
             why = (noCursorSession
                 ? $"no Cursor session (database {CursorSession.DatabasePath()}: {(File.Exists(CursorSession.DatabasePath()) ? "exists" : "missing")}, CLI auth {(File.Exists(CursorSession.CliAuthPath()) ? "exists" : "missing")})"
                 : "Cursor session rejected")
+                + "; Firefox program: " + (SessionSetup.FindFirefox() ?? "not found")
                 + "; Firefox: " + FirefoxSession.Diagnose();
         }
         catch (Exception ex)

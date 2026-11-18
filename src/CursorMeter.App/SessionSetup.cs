@@ -76,17 +76,68 @@ internal sealed record SessionSetup(
         return OnPath("cursor");
     }
 
-    private static string? FindFirefox()
+    internal static string? FindFirefox()
     {
         if (OperatingSystem.IsWindows())
         {
             return First(
-                Path.Combine(Folder(Environment.SpecialFolder.ProgramFiles), "Mozilla Firefox", "firefox.exe"),
-                Path.Combine(Folder(Environment.SpecialFolder.ProgramFilesX86), "Mozilla Firefox", "firefox.exe"),
-                Path.Combine(Folder(Environment.SpecialFolder.LocalApplicationData), "Mozilla Firefox", "firefox.exe"));
+                       Path.Combine(Folder(Environment.SpecialFolder.ProgramFiles), "Mozilla Firefox", "firefox.exe"),
+                       Path.Combine(Folder(Environment.SpecialFolder.ProgramFilesX86), "Mozilla Firefox", "firefox.exe"),
+                       Path.Combine(Folder(Environment.SpecialFolder.LocalApplicationData), "Mozilla Firefox", "firefox.exe"))
+                   ?? FindFirefoxInRegistry()
+                   ?? OnPath("firefox.exe");
         }
 
         return OnPath("firefox");
+    }
+
+    /// <summary>
+    /// The Firefox installer registers the program under <c>App Paths</c>, wherever it was installed
+    /// (another drive, a per-user install), and keeps the install folder under <c>Mozilla\Mozilla Firefox</c>.
+    /// </summary>
+    [System.Runtime.Versioning.SupportedOSPlatform("windows")]
+    private static string? FindFirefoxInRegistry()
+    {
+        try
+        {
+            foreach (var hive in new[] { Microsoft.Win32.RegistryHive.LocalMachine, Microsoft.Win32.RegistryHive.CurrentUser })
+            foreach (var view in new[] { Microsoft.Win32.RegistryView.Registry64, Microsoft.Win32.RegistryView.Registry32 })
+            {
+                using var root = Microsoft.Win32.RegistryKey.OpenBaseKey(hive, view);
+
+                using (var appPath = root.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\firefox.exe"))
+                {
+                    if (ExistingProgram(appPath?.GetValue(null) as string) is { } found)
+                        return found;
+                }
+
+                using var mozilla = root.OpenSubKey(@"SOFTWARE\Mozilla\Mozilla Firefox");
+                if (mozilla is null)
+                    continue;
+                if (mozilla.GetValue("CurrentVersion") is string version
+                    && mozilla.OpenSubKey(version + @"\Main") is { } main)
+                {
+                    using (main)
+                    {
+                        if (ExistingProgram(main.GetValue("PathToExe") as string) is { } found)
+                            return found;
+                    }
+                }
+            }
+        }
+        catch (Exception ex) when (ex is System.Security.SecurityException or UnauthorizedAccessException or IOException)
+        {
+        }
+
+        return null;
+    }
+
+    private static string? ExistingProgram(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            return null;
+        path = path.Trim().Trim('"');
+        return File.Exists(path) ? path : null;
     }
 
     private static string Folder(Environment.SpecialFolder folder)
