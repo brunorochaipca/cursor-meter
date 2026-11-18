@@ -25,7 +25,7 @@ O nome vem das ilhas do Start11 v3. A Island vive nelas. A Mainland é para a ba
 
 **Qual escolher?** Com o Start11 v3 ou sem Start11, a Island. Com o Start11 v1 ou v2, a Mainland: nestas versões, abrir e fechar o menu Iniciar ou a Vista de Tarefas **com o rato** deixa a barra de tarefas por cima das barras do CursorMeter até ao próximo clique (com a tecla do Windows não acontece). O modo administrador experimental resolve isto.
 
-O instalador da Mainland, ao detetar um Start11 anterior ao v3, recomenda instalar com permissão de administrador (modo experimental). Está previsto o da Island avisar, nesse caso, que a edição não é totalmente compatível e recomendar a Mainland. As duas edições usam a mesma pasta e o mesmo registo de instalação: instalar uma substitui a outra. Na Mainland, o ecrã **Acerca de** e o registo mostram a edição.
+O instalador da Mainland, ao detetar um Start11 anterior ao v3, recomenda instalar com permissão de administrador (modo experimental). O da Island, nesse caso, avisa que a edição não é totalmente compatível e recomenda a Mainland (a partir da próxima versão estável). As duas edições usam a mesma pasta e o mesmo registo de instalação: instalar uma substitui a outra. Na Mainland, o ecrã **Acerca de** e o registo mostram a edição.
 
 ### Modo administrador experimental (Mainland)
 
