@@ -45,6 +45,24 @@ internal static class NativeMethods
     public const int ComplexRegion = 3;
     public const int RgnDiff = 4;
     public const uint DesktopBand = 1;
+    public const uint UiAccessBand = 2;
+
+    // UIAccess token duplication.
+    public const uint ProcessQueryLimitedInformation = 0x1000;
+    public const uint TokenAssignPrimary = 0x0001;
+    public const uint TokenDuplicate = 0x0002;
+    public const uint TokenImpersonate = 0x0004;
+    public const uint TokenQuery = 0x0008;
+    public const uint TokenAdjustDefault = 0x0080;
+    public const int TokenSessionId = 12;
+    public const int TokenElevation = 20;
+    public const int TokenUiAccess = 26;
+    public const int SecurityAnonymous = 0;
+    public const int SecurityImpersonation = 2;
+    public const int TokenPrimary = 1;
+    public const int TokenImpersonation = 2;
+    public const uint PrivilegeSetAllNecessary = 1;
+    public const uint CreateUnicodeEnvironment = 0x00000400;
 
     // Notification area icon.
     public const uint WmTray = 0x8001; // WM_APP + 1
@@ -241,6 +259,80 @@ internal static class NativeMethods
     [DllImport("user32.dll")]
     public static extern bool SetForegroundWindow(IntPtr hwnd);
 
+    [DllImport("kernel32.dll")]
+    public static extern IntPtr GetCurrentProcess();
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    public static extern IntPtr OpenProcess(uint desiredAccess, bool inheritHandle, int processId);
+
+    [DllImport("kernel32.dll")]
+    public static extern bool CloseHandle(IntPtr handle);
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    public static extern bool OpenProcessToken(IntPtr processHandle, uint desiredAccess, out IntPtr tokenHandle);
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    public static extern bool GetTokenInformation(
+        IntPtr tokenHandle,
+        int tokenInformationClass,
+        out uint tokenInformation,
+        int tokenInformationLength,
+        out int returnLength);
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    public static extern bool SetTokenInformation(
+        IntPtr tokenHandle,
+        int tokenInformationClass,
+        ref uint tokenInformation,
+        int tokenInformationLength);
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    public static extern bool DuplicateTokenEx(
+        IntPtr existingToken,
+        uint desiredAccess,
+        IntPtr tokenAttributes,
+        int impersonationLevel,
+        int tokenType,
+        out IntPtr newToken);
+
+    [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    public static extern bool LookupPrivilegeValue(string? systemName, string name, out Luid luid);
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    public static extern bool PrivilegeCheck(IntPtr clientToken, ref PrivilegeSet requiredPrivileges, out bool result);
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    public static extern bool SetThreadToken(IntPtr thread, IntPtr token);
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    public static extern bool RevertToSelf();
+
+    [DllImport("advapi32.dll", EntryPoint = "CreateProcessAsUserW", CharSet = CharSet.Unicode, SetLastError = true)]
+    public static extern bool CreateProcessAsUser(
+        IntPtr token,
+        string? applicationName,
+        System.Text.StringBuilder commandLine,
+        IntPtr processAttributes,
+        IntPtr threadAttributes,
+        bool inheritHandles,
+        uint creationFlags,
+        IntPtr environment,
+        string? currentDirectory,
+        ref StartupInfo startupInfo,
+        out ProcessInformation processInformation);
+
+    [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    public static extern bool CreateProcessWithTokenW(
+        IntPtr token,
+        uint logonFlags,
+        string? applicationName,
+        System.Text.StringBuilder commandLine,
+        uint creationFlags,
+        IntPtr environment,
+        string? currentDirectory,
+        ref StartupInfo startupInfo,
+        out ProcessInformation processInformation);
+
     [DllImport("user32.dll")]
     public static extern bool PostMessage(IntPtr hwnd, uint message, IntPtr wParam, IntPtr lParam);
 
@@ -264,6 +356,10 @@ internal static class NativeMethods
 
     [DllImport("gdi32.dll")]
     public static extern IntPtr CreateRectRgn(int left, int top, int right, int bottom);
+
+    [DllImport("gdi32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool PtInRegion(IntPtr region, int x, int y);
 
     [DllImport("gdi32.dll")]
     public static extern int CombineRgn(IntPtr destination, IntPtr source1, IntPtr source2, int mode);
@@ -341,5 +437,59 @@ internal static class NativeMethods
         public string? MenuName;
         public string ClassName;
         public IntPtr IconSmall;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct Luid
+    {
+        public uint LowPart;
+        public int HighPart;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct LuidAndAttributes
+    {
+        public Luid Luid;
+        public uint Attributes;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct PrivilegeSet
+    {
+        public uint PrivilegeCount;
+        public uint Control;
+        public LuidAndAttributes Privilege;
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    public struct StartupInfo
+    {
+        public int Cb;
+        public string? Reserved;
+        public string? Desktop;
+        public string? Title;
+        public int X;
+        public int Y;
+        public int XSize;
+        public int YSize;
+        public int XCountChars;
+        public int YCountChars;
+        public int FillAttribute;
+        public int Flags;
+        public short ShowWindow;
+        public short Reserved2;
+        public IntPtr Reserved3;
+        public IntPtr StdInput;
+        public IntPtr StdOutput;
+        public IntPtr StdError;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct ProcessInformation
+    {
+        public IntPtr Process;
+        public IntPtr Thread;
+        public uint ProcessId;
+        public uint ThreadId;
     }
 }

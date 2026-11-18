@@ -29,6 +29,9 @@ internal sealed class TaskbarEmbedder : IDisposable
     /// <summary>Extra room, at 96 DPI, that floating bars ask for before going back on the island.</summary>
     private const int FloatHysteresis = 16;
 
+    /// <summary>True when this process has UIAccess, so its topmost windows sit above the raised taskbar.</summary>
+    private static readonly bool UiAccessActive = OperatingSystem.IsWindows() && UiAccess.IsActive;
+
     private readonly WidgetWindow _widget;
     private readonly NativeMethods.WinEventDelegate _onTaskbarEvent;
     private readonly DispatcherTimer _settleTimer;
@@ -43,8 +46,10 @@ internal sealed class TaskbarEmbedder : IDisposable
     private bool _onIsland;
     private bool _floating;
     private bool _holeOpen;
+    private bool _regionOwnedElsewhere;
     private bool _fullscreen;
     private PxRect _holeSlot;
+    private readonly RegionCutGuard _cutGuard = new();
 
     public TaskbarEmbedder(WidgetWindow widget)
     {
@@ -178,11 +183,30 @@ internal sealed class TaskbarEmbedder : IDisposable
         {
             if (TaskbarRaised(taskbar))
             {
-                if (HoldInsideTaskbar(taskbar, taskbarPx, screenSlot))
+                if (UiAccessActive)
+                {
+                    // With UIAccess the bars sit in ZBID_UIACCESS, above the raised taskbar in every
+                    // state, so there is nothing to cut and no need to step aside.
+                    ReleaseHole(taskbar);
+                    Mode($"overlay above the raised taskbar (UIAccess), slot {Describe(screenSlot)}, dpi {dpi}");
+                    DockOver(screenSlot, lifted: false);
+                }
+                else if (!_regionOwnedElsewhere && HoldInsideTaskbar(taskbar, taskbarPx, screenSlot))
                 {
                     Mode($"overlay through the taskbar, no island, slot {Describe(screenSlot)}, dpi {dpi}");
                     DockOver(screenSlot, lifted: false);
                     ArmLiftWatch(true);
+                }
+                else if (_regionOwnedElsewhere)
+                {
+                    // Start11 puts its own region back on the raised taskbar at once, so a cut only
+                    // flickers, and behind the Start menu it shows the menu instead of the bars. The region
+                    // is left alone and the bars stay where they are, covered, until the taskbar is back on
+                    // the desktop. Experimental administrator mode (UIAccess) avoids this entirely.
+                    _holeOpen = false;
+                    _holeSlot = default;
+                    Mode($"overlay on the raised taskbar, its region belongs to another program, slot {Describe(screenSlot)}, dpi {dpi}");
+                    DockOver(screenSlot, lifted: false);
                 }
                 else
                 {
@@ -195,6 +219,7 @@ internal sealed class TaskbarEmbedder : IDisposable
             else
             {
                 ReleaseHole(taskbar);
+                _cutGuard.Reset();
                 Mode($"overlay on the taskbar, no island, slot {Describe(screenSlot)}, dpi {dpi}");
                 DockOver(screenSlot, lifted: false);
             }
@@ -336,9 +361,12 @@ internal sealed class TaskbarEmbedder : IDisposable
 
     private void OnOrderTick()
     {
+        if (!_widget.IsAlive || _widget.IsDragging)
+            return;
+
         // While lifted the bars sit beside the taskbar, so the order does not matter. The lift
         // watch keeps placing them until the taskbar is back in the bars' band.
-        if (!_widget.IsAlive || _widget.IsDragging || !_widget.PinTopmost || _widget.HeldHidden || _lifted)
+        if (!_widget.PinTopmost || _widget.HeldHidden || _lifted)
             return;
 
         var taskbar = NativeMethods.FindWindow("Shell_TrayWnd", null);
@@ -349,7 +377,7 @@ internal sealed class TaskbarEmbedder : IDisposable
         // there after it closes. No topmost window can sit over a taskbar in a higher band.
         // An island sits outside the taskbar's region, so the band does not hide it.
         // Floating bars are clear of the taskbar as well.
-        if (!_onIsland && !_floating && TaskbarInOtherBand(taskbar))
+        if (!_onIsland && !_floating && !UiAccessActive && TaskbarInOtherBand(taskbar))
         {
             Place();
             return;
@@ -368,6 +396,7 @@ internal sealed class TaskbarEmbedder : IDisposable
         {
             return NativeMethods.GetWindowBand(taskbar, out var taskbarBand)
                 && NativeMethods.GetWindowBand(_widget.Handle, out var widgetBand)
+                && widgetBand != NativeMethods.UiAccessBand
                 && taskbarBand != widgetBand
                 && !SameBand(_widget.Handle, taskbar);
         }
@@ -445,6 +474,22 @@ internal sealed class TaskbarEmbedder : IDisposable
     /// </summary>
     private bool HoldInsideTaskbar(IntPtr taskbar, PxRect taskbarPx, PxRect slot)
     {
+        // Start11 clears the region of the raised taskbar, which undoes this cut. Cutting again each
+        // time would flicker the bars, so after a few losses in a row the cut is dropped.
+        if (_holeOpen)
+        {
+            bool intact = HoleIntact(taskbar, taskbarPx);
+            bool couldCut = _cutGuard.MayCut;
+            _cutGuard.Report(intact);
+            if (couldCut && !_cutGuard.MayCut)
+            {
+                _regionOwnedElsewhere = true;
+                AppLog.Info("Taskbar region keeps being reset by another program, it is no longer cut");
+            }
+        }
+
+        if (!_cutGuard.MayCut)
+            return false;
         if (!CanCutTaskbar(taskbar))
             return false;
         if (_holeOpen
@@ -452,7 +497,7 @@ internal sealed class TaskbarEmbedder : IDisposable
             && slot.Top == _holeSlot.Top
             && slot.Width == _holeSlot.Width
             && slot.Height == _holeSlot.Height
-            && RegionKind(taskbar) == NativeMethods.ComplexRegion)
+            && HoleIntact(taskbar, taskbarPx))
             return true;
 
         int left = slot.Left - taskbarPx.Left;
@@ -493,13 +538,38 @@ internal sealed class TaskbarEmbedder : IDisposable
         return true;
     }
 
-    private bool CanCutTaskbar(IntPtr taskbar)
+    /// <summary>
+    /// A taskbar in a higher band can only be cut. Start11 shapes its taskbar with a complex region
+    /// of its own, and the cut goes over it: the guard gives up if it keeps being put back.
+    /// An empty region has nothing to cut.
+    /// </summary>
+    private static bool CanCutTaskbar(IntPtr taskbar) => RegionKind(taskbar) != NullRegion;
+
+    /// <summary>
+    /// True while the hole for the bars is still in the taskbar region. A complex region alone
+    /// does not say so: Start11 puts a complex region of its own back, and that one has no hole.
+    /// </summary>
+    private bool HoleIntact(IntPtr taskbar, PxRect taskbarPx)
     {
-        if (_holeOpen)
+        var probe = NativeMethods.CreateRectRgn(0, 0, 0, 0);
+        if (probe == IntPtr.Zero)
             return true;
-        int kind = RegionKind(taskbar);
-        return kind == 0 || kind == NativeMethods.SimpleRegion;
+        try
+        {
+            int kind = NativeMethods.GetWindowRgn(taskbar, probe);
+            if (kind == 0 || kind == NullRegion)
+                return false;
+            int x = _holeSlot.Left - taskbarPx.Left + (_holeSlot.Width / 2);
+            int y = _holeSlot.Top - taskbarPx.Top + (_holeSlot.Height / 2);
+            return !NativeMethods.PtInRegion(probe, x, y);
+        }
+        finally
+        {
+            NativeMethods.DeleteObject(probe);
+        }
     }
+
+    private const int NullRegion = 1;
 
     private static int RegionKind(IntPtr window)
     {

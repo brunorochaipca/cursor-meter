@@ -20,6 +20,19 @@ internal static class AppInfo
         }
     }
 
+    /// <summary>The edition this build belongs to: Island (stable, Start11 v3) or Mainland (beta, Start11 v1/v2).</summary>
+#if MAINLAND
+    public static string Edition => "Mainland";
+#else
+    public static string Edition => "Island";
+#endif
+
+    /// <summary>True for the Mainland edition, the only one that carries the experimental administrator mode.</summary>
+    public static bool IsMainland => Edition == "Mainland";
+
+    /// <summary>Product name followed by the edition, for the About window and reports.</summary>
+    public static string Product => $"CursorMeter {Edition}";
+
     public static string Platform => $"{RuntimeInformation.OSDescription}, {RuntimeInformation.FrameworkDescription}";
 
     /// <summary>Opens a web address or a folder with the system's default program. False when there is none.</summary>

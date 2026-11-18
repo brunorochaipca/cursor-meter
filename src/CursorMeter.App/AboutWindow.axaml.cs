@@ -15,7 +15,8 @@ internal sealed partial class AboutWindow : Window
         InitializeComponent();
         Icon = AppIcon.Create();
         Logo.Source = AppIcon.Render(128);
-        VersionText.Text = $"Versão {AppInfo.Version}";
+        VersionText.Text = $"Edição {AppInfo.Edition} · versão {AppInfo.Version}"
+            + (OperatingSystem.IsWindows() && Windows.UiAccess.IsActive ? " · modo administrador experimental" : "");
         LogPathText.Text = AppLog.FilePath;
 
         RepositoryButton.Click += (_, _) =>
@@ -42,7 +43,7 @@ internal sealed partial class AboutWindow : Window
             return;
         }
 
-        var report = $"CursorMeter {AppInfo.Version}{Environment.NewLine}{AppInfo.Platform}{Environment.NewLine}{Environment.NewLine}{log}";
+        var report = $"{AppInfo.Product} {AppInfo.Version}{Environment.NewLine}{AppInfo.Platform}{Environment.NewLine}{Environment.NewLine}{log}";
         try
         {
             await (Clipboard ?? throw new InvalidOperationException("No clipboard")).SetTextAsync(report);
@@ -76,9 +77,9 @@ internal sealed partial class AboutWindow : Window
 
     private static bool OpenIssue()
     {
-        var title = Uri.EscapeDataString($"Registos do CursorMeter {AppInfo.Version}");
+        var title = Uri.EscapeDataString($"Registos do {AppInfo.Product} {AppInfo.Version}");
         var body = Uri.EscapeDataString(
-            $"Versão: {AppInfo.Version}\nSistema: {AppInfo.Platform}\n\nO que aconteceu:\n\n\nRegisto (cola aqui, já está na área de transferência):\n\n```\n\n```\n");
+            $"Edição: {AppInfo.Edition}\nVersão: {AppInfo.Version}\nSistema: {AppInfo.Platform}\n\nO que aconteceu:\n\n\nRegisto (cola aqui, já está na área de transferência):\n\n```\n\n```\n");
         return AppInfo.TryOpen($"{AppInfo.Repository}/issues/new?title={title}&body={body}");
     }
 

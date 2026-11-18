@@ -12,9 +12,35 @@ Cada barra é a quota desse pool no ciclo atual. Cursor Models corresponde a `au
 
 Lê a sessão que o próprio Cursor gravou ao iniciares sessão, em `%APPDATA%\Cursor\User\globalStorage\state.vscdb`. Se essa sessão expirar, usa a sessão de cursor.com que estiver no Firefox. Não envia nada para além do pedido de uso ao próprio Cursor.
 
+## Edições
+
+O CursorMeter tem duas edições para Windows, com a mesma base de código:
+
+| Edição | Versão | Para quem | O que faz de diferente |
+|---|---|---|---|
+| **Island** | estável, 1.3.1 | Windows 11 com o [Start11 v3](https://www.stardock.com/products/start11/), ou sem Start11 | As barras são mais uma ilha da barra de tarefas. Corre sem permissões de administrador. |
+| **Mainland** | beta, 1.4.0-beta.1 | Windows 10 e 11, incluindo o Start11 v1 e v2 | Tudo o que a Island faz, mais um **modo administrador experimental** (UIAccess) que mantém as barras visíveis em cima da barra de tarefas. |
+
+O nome vem das ilhas do Start11 v3. A Island vive nelas. A Mainland é para a barra de tarefas de sempre, o continente, sem ilhas.
+
+**Qual escolher?** Com o Start11 v3 ou sem Start11, a Island. Com o Start11 v1 ou v2, a Mainland: nestas versões, abrir e fechar o menu Iniciar ou a Vista de Tarefas **com o rato** deixa a barra de tarefas por cima das barras do CursorMeter até ao próximo clique (com a tecla do Windows não acontece). O modo administrador experimental resolve isto.
+
+O instalador da Island deteta um Start11 anterior ao v3, avisa que a edição não é totalmente compatível e recomenda a Mainland. O da Mainland, nesse caso, recomenda instalar com permissão de administrador (modo experimental). As duas edições usam a mesma pasta e o mesmo registo de instalação: instalar uma substitui a outra. O ecrã **Acerca de** mostra a edição, e o registo também.
+
+### Modo administrador experimental (Mainland)
+
+O Windows põe a barra de tarefas numa camada acima das janelas normais quando o Start11 anterior ao v3 a "levanta". Só um processo com `UIAccess` consegue ficar acima dessa camada. A Mainland cria esse estado como o [AlwaysOnTop](https://github.com/TopSoftdeveloper/AlwaysOnTop): corre elevada, copia o token do `winlogon.exe` da sessão e relança-se com `UIAccess` ativo. Por isso:
+
+- **Pede permissão de administrador** (UAC) ao iniciar, ou ao instalar se escolheres o arranque com o Windows.
+- **O arranque com o Windows usa uma Tarefa Agendada** (`CursorMeter`, privilégio mais alto) em vez de um atalho, para não pedir o UAC a cada início de sessão.
+- **É experimental.** Se o UIAccess não ficar ativo, a app continua sem ele, como a Island, e o motivo fica no registo.
+- **Só existe na Mainland.** A Island ignora o ficheiro `experimental-admin` e nunca se eleva.
+
+O modo ativa-se quando, no instalador, respondes Sim ao aviso do Start11 anterior ao v3. Desinstalar apaga a Tarefa Agendada. Para o desligar sem desinstalar, apaga `experimental-admin` na pasta do programa e a tarefa `CursorMeter` no Agendador de Tarefas.
+
 ## Para quem é
 
-No **Windows**, a aplicação foi pensada para o Windows 11 com o [Start11 v3](https://www.stardock.com/products/start11/), da Stardock. O Start11 v3 trouxe as "ilhas" da barra de tarefas: em vez de uma faixa de lado a lado, a barra passa a blocos arredondados, como num dock. O CursorMeter replica esse conceito e apresenta-se como mais uma ilha, com o mesmo aspeto das que o Start11 desenha.
+No **Windows**, a edição Island foi pensada para o Windows 11 com o Start11 v3, da Stardock. O Start11 v3 trouxe as "ilhas" da barra de tarefas: em vez de uma faixa de lado a lado, a barra passa a blocos arredondados, como num dock. O CursorMeter replica esse conceito e apresenta-se como mais uma ilha, com o mesmo aspeto das que o Start11 desenha.
 
 No **Ubuntu**, é um ícone na área de notificação com as percentagens ao lado. Ver [Ubuntu](#ubuntu).
 
@@ -84,7 +110,7 @@ Se numa máquina não aparecerem, abre **Acerca de** no menu do botão direito: 
 
 ### Instalar
 
-A release traz um instalador para Windows de 64 bits. Não pede administrador: o programa fica em `%LOCALAPPDATA%\Programs\CursorMeter` e aparece em Aplicações instaladas. A posição das barras, quando não estás no modo ilha, continua em `%LOCALAPPDATA%\CursorMeter\offset.txt`, por isso uma reinstalação não a apaga.
+A release traz um instalador para Windows de 64 bits por edição: `CursorMeter-Island-Setup-<versão>.exe` e `CursorMeter-Mainland-Setup-<versão>.exe` (esta marcada como pré-lançamento). Os instaladores não pedem administrador (a Mainland só pede, para registar o arranque, se ativares o modo experimental). O programa fica em `%LOCALAPPDATA%\Programs\CursorMeter` e aparece em Aplicações instaladas. A posição das barras, quando não estás no modo ilha, continua em `%LOCALAPPDATA%\CursorMeter\offset.txt`, por isso uma reinstalação não a apaga.
 
 O Windows pode dizer que o publicador é desconhecido, porque o instalador não está assinado. No assistente podes deixar marcado o arranque com o Windows. O mesmo interruptor está no menu do botão direito.
 
@@ -129,10 +155,10 @@ No Windows, com o [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
 
 ```powershell
 .\scripts\build-windows.ps1
-.\src\CursorMeter.App\bin\Release\net8.0\win-x64\publish\CursorMeter.exe
+.\src\CursorMeter.App\bin\Release\net8.0\win-x64\publish-mainland\CursorMeter.exe
 ```
 
-O instalador, `dist\CursorMeter-Setup-<versão>.exe`, sai de `.\scripts\build-installer.ps1`.
+Esta branch (`mainland`) compila a edição Mainland, em `publish-mainland`. O instalador, `dist\CursorMeter-Mainland-Setup-<versão>.exe`, sai de `.\scripts\build-installer.ps1`. A edição Island vive na branch `main`.
 
 As barras aparecem na barra de tarefas, como descrito em [Windows](#windows).
 

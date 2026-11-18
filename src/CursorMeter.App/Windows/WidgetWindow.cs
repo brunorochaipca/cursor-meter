@@ -35,6 +35,7 @@ internal sealed class WidgetWindow : Window
         CanResize = false;
         ShowInTaskbar = false;
         ShowActivated = false;
+        Topmost = OperatingSystem.IsWindows() && UiAccess.IsActive;
         WindowStartupLocation = WindowStartupLocation.Manual;
         Width = TaskbarLayout.PreferredWidth;
         Height = TaskbarLayout.PreferredHeight;

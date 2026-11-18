@@ -10,6 +10,12 @@ internal static class Program
     {
         // On Unix, Local\ is scoped to the terminal session, so the desktop menu, autostart and a shell would each get their own.
         var name = OperatingSystem.IsWindows() ? @"Local\CursorMeter" : @"Global\CursorMeter-" + Environment.UserName;
+        if (IsAlreadyRunning(name))
+            return 0;
+
+        if (OperatingSystem.IsWindows() && Windows.UiAccess.RelaunchIfNeeded(args))
+            return 0;
+
         using var mutex = new Mutex(true, name, out var created);
         if (!created)
             return 0;
@@ -17,6 +23,25 @@ internal static class Program
         var code = BuildAvaloniaApp().StartWithClassicDesktopLifetime(args, ShutdownMode.OnExplicitShutdown);
         mutex.ReleaseMutex();
         return code;
+    }
+
+    private static bool IsAlreadyRunning(string mutexName)
+    {
+        try
+        {
+            if (Mutex.TryOpenExisting(mutexName, out var existing))
+            {
+                existing.Dispose();
+                return true;
+            }
+
+            return false;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // An elevated UIAccess instance already holds the session mutex.
+            return true;
+        }
     }
 
         // Windows 10 reparents the bars into the taskbar, where only a plain GDI blit shows.
