@@ -22,6 +22,20 @@ Se a pasta e a branch não corresponderem à edição pretendida, **não mudes d
 - Compila e testa sempre na pasta da edição em que estás a trabalhar (`dotnet test`, `scripts\build-installer.ps1`). Cada pasta tem os seus `bin` e `obj`.
 - As duas edições partilham o AppId do instalador, o mutex `Local\CursorMeter` e `%LOCALAPPDATA%\CursorMeter`: instalar uma substitui a outra e nunca correm as duas ao mesmo tempo.
 
+## Publicar uma release
+
+Quando o programador pede para **publicar uma release**, isso inclui **fazer commit e push para a branch da respetiva edição** (`main` para a Island, `mainland` para a Mainland). Não precisa de pedir autorização separada para o commit. Passos, por esta ordem:
+
+1. Confirma a edição (ver acima) e trabalha na pasta dessa edição.
+2. Atualiza a versão (`.csproj` e `app.manifest`), compila, corre os testes e gera o instalador (`scripts\build-installer.ps1`).
+3. Faz commit só do que pertence à release e push para a branch da edição. Não incluas ficheiros alheios (por exemplo alterações soltas em `scripts\test-start-menu.ps1`).
+4. Cria a etiqueta e a release no GitHub a apontar para esse commit (`gh release create ... --target <branch>`), com as notas em português e o instalador como anexo:
+   - **Island:** etiqueta `v1.3.x`, release normal, branch `main`.
+   - **Mainland:** etiqueta `v1.4.0-beta.N`, `--prerelease --latest=false`, branch `mainland`.
+5. Nas notas, diz o que foi testado e o que não foi.
+
+Se a versão pedida já existir como release, não a substituas: pergunta ao programador.
+
 ## Contexto útil
 
 - A beta existe por causa de um problema do Start11 anterior ao v3: depois de abrir e fechar o menu Iniciar ou a Vista de Tarefas com o rato, a barra de tarefas fica numa camada acima das barras. O modo UIAccess (token do `winlogon.exe`, como o AlwaysOnTop) resolve-o, à custa de correr como administrador.
