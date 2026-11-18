@@ -24,6 +24,8 @@ A ilha:
 
 Testado com o Start11 v3 beta, no Windows 11, a 125% de zoom, com a barra em baixo. A barra no topo ou vertical não usa o modo ilha.
 
+Com a barra de tarefas à **esquerda ou à direita** (Windows 11 recente), as barras dão lugar a **dois círculos**, "Cursor" e "Other", com a percentagem dentro, acima da área de notificação. Esta disposição ainda não foi testada numa barra vertical real.
+
 ## Outros alinhamentos do Start11
 
 O Start11 também deixa alinhar os ícones à esquerda ou só os botões ao centro. A ilha das barras procura sempre espaço livre entre as ilhas do Start11, por esta ordem:

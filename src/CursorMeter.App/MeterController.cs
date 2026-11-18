@@ -209,6 +209,9 @@ internal sealed class MeterController : IDisposable
         var flyout = new FlyoutWindow();
         flyout.RefreshRequested += (_, _) => _ = RefreshAsync();
         flyout.DashboardRequested += (_, _) => OpenDashboard();
+        flyout.OpenCursorRequested += (_, _) => _state.Setup?.OpenCursor();
+        flyout.DownloadCursorRequested += (_, _) => SessionSetup.OpenDownload();
+        flyout.OpenFirefoxRequested += (_, _) => _state.Setup?.OpenFirefox();
         flyout.Closed += (_, _) =>
         {
             _flyout = null;
@@ -248,9 +251,10 @@ internal sealed class MeterController : IDisposable
             }
             catch (CursorAuthException ex)
             {
+                var setup = SessionSetup.Inspect(session);
                 return session is null
-                    ? new MeterState("Abre o Cursor", ex.Message, "Entra no Cursor ou em cursor.com no Firefox.")
-                    : new MeterState("Sessão expirada", ex.Message, "Entra em cursor.com no Firefox.");
+                    ? new MeterState("Abre o Cursor", ex.Message, "Entra no Cursor ou em cursor.com no Firefox.", Setup: setup)
+                    : new MeterState("Sessão expirada", ex.Message, "Entra em cursor.com no Firefox.", Setup: setup);
             }
 
             var line = QuotaText.Line(quotas);
@@ -265,6 +269,30 @@ internal sealed class MeterController : IDisposable
         {
             return new MeterState("Sem ligação", "Não consegui falar com o Cursor.", null);
         }
+    }
+
+    private string? _lastNoSession;
+
+    /// <summary>Writes why no session was found, once per distinct finding, so the log explains it without repeating on every refresh.</summary>
+    private void LogNoSession(bool noCursorSession)
+    {
+        string why;
+        try
+        {
+            why = (noCursorSession
+                ? $"no Cursor session (database {CursorSession.DatabasePath()}: {(File.Exists(CursorSession.DatabasePath()) ? "exists" : "missing")}, CLI auth {(File.Exists(CursorSession.CliAuthPath()) ? "exists" : "missing")})"
+                : "Cursor session rejected")
+                + "; Firefox: " + FirefoxSession.Diagnose();
+        }
+        catch (Exception ex)
+        {
+            why = "diagnosis failed: " + ex.Message;
+        }
+
+        if (why == _lastNoSession)
+            return;
+        _lastNoSession = why;
+        AppLog.Info("No usable session: " + why);
     }
 
     private async Task<UsageQuotas> LoadQuotasAsync(CursorSession? session)
@@ -283,6 +311,7 @@ internal sealed class MeterController : IDisposable
         var cookie = FirefoxSession.TryLoadDefault();
         if (cookie is null)
         {
+            LogNoSession(session is null);
             throw new CursorAuthException(session is null
                 ? "Sem sessão do Cursor. Entra no Cursor ou em cursor.com no Firefox."
                 : "A sessão do Cursor expirou. Entra em cursor.com no Firefox.");

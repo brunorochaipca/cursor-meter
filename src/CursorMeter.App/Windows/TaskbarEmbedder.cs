@@ -144,7 +144,8 @@ internal sealed class TaskbarEmbedder : IDisposable
         var trayPx = tray != IntPtr.Zero && NativeMethods.GetWindowRect(tray, out var found) ? ToPx(found) : default;
         var edge = TaskbarLayout.DetectEdge(taskbarPx, monitor);
         int dpi = DpiOf(taskbar);
-        int width = TaskbarLayout.Scale(TaskbarLayout.PreferredWidth, dpi);
+        _widget.Vertical = TaskbarLayout.IsVertical(edge);
+        var (width, height) = TaskbarLayout.FitSize(taskbarPx, edge, dpi);
         // The cut this app makes in the taskbar for Start looks like islands too, so it is not read.
         NoRoom? noRoom = null;
         var island = overlay && !_holeOpen
@@ -169,7 +170,6 @@ internal sealed class TaskbarEmbedder : IDisposable
             return;
         }
 
-        int height = TaskbarLayout.FitThickness(taskbarPx.Height, dpi);
         var screenSlot = TaskbarLayout.Place(taskbarPx, trayPx, edge, _delta, width, height);
         if (screenSlot.IsEmpty)
         {
@@ -281,8 +281,8 @@ internal sealed class TaskbarEmbedder : IDisposable
         var trayPx = tray != IntPtr.Zero && NativeMethods.GetWindowRect(tray, out var found) ? ToPx(found) : default;
         var edge = TaskbarLayout.DetectEdge(taskbarPx, MonitorOf(taskbar, taskbarRect));
         int dpi = DpiOf(taskbar);
-        int height = TaskbarLayout.FitThickness(taskbarPx.Height, dpi);
-        var natural = TaskbarLayout.Place(taskbarPx, trayPx, edge, 0, TaskbarLayout.Scale(TaskbarLayout.PreferredWidth, dpi), height);
+        var (width, height) = TaskbarLayout.FitSize(taskbarPx, edge, dpi);
+        var natural = TaskbarLayout.Place(taskbarPx, trayPx, edge, 0, width, height);
         _delta = edge is BarEdge.Left or BarEdge.Right
             ? screenTop - natural.Top
             : screenLeft - natural.Left;
@@ -791,6 +791,7 @@ internal sealed class TaskbarEmbedder : IDisposable
         Mode("no taskbar found, floating in the screen corner");
         _onIsland = false;
         _floating = false;
+        _widget.Vertical = false;
         _widget.Floating = false;
         _widget.ShowIsland(null);
         Embedded = _widget.Embedded = false;

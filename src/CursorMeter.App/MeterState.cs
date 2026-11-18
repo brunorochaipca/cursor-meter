@@ -4,7 +4,8 @@ namespace CursorMeter.App;
 /// What every surface shows: the bars, the flyout and the tray tooltip.
 /// Without quotas, the bars show <see cref="Status"/> (or the detail when there is no status).
 /// </summary>
-internal sealed record MeterState(string? Status, string Detail, string? Secondary, UsageQuotas? Quotas = null)
+/// <param name="Setup">Set when there is no usable session: where the account could be read from and what is missing.</param>
+internal sealed record MeterState(string? Status, string Detail, string? Secondary, UsageQuotas? Quotas = null, SessionSetup? Setup = null)
 {
     public static MeterState Loading { get; } = new(
         "A ler…",

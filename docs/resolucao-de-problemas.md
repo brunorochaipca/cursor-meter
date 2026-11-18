@@ -6,6 +6,10 @@ Abre **Acerca de** no menu do botão direito: mostra a versão e o ficheiro de r
 
 Confirma também que o Cursor tem a sessão iniciada: o CursorMeter lê a sessão que o Cursor gravou. Se essa sessão tiver expirado, usa a de cursor.com no Firefox.
 
+## "Ligar a conta do Cursor" (Windows)
+
+Sem sessão, o resumo mostra o que falta em cada fonte: o Cursor e o Firefox. Só o Firefox é lido, não o Edge nem o Chrome. Se entraste em cursor.com no Firefox e continua sem funcionar, o Firefox pode não estar a guardar cookies: a opção "Apagar cookies e dados dos sites quando o Firefox fecha", o modo privado permanente ou uma política da organização. Abre uma exceção para `https://cursor.com` em Definições › Privacidade e segurança › Cookies › Gerir exceções, ou instala o Cursor e inicia sessão lá. Depois carrega em **Verificar já**. A app não volta a verificar sozinha enquanto o resumo está aberto.
+
 ## Onde ficam os ficheiros (Windows)
 
 Em `%LOCALAPPDATA%\CursorMeter`:

@@ -57,6 +57,52 @@ public sealed class TaskbarLayoutTests
         Assert.InRange(slot.Height, 28, thickness);
     }
 
+    [Theory]
+    [InlineData(BarEdge.Left, 0, 96)]
+    [InlineData(BarEdge.Right, 1920 - 72, 96)]
+    [InlineData(BarEdge.Left, 0, 144)]
+    public void Place_stacks_the_bars_inside_a_vertical_taskbar(BarEdge edge, int left, int dpi)
+    {
+        int thickness = TaskbarLayout.Scale(72, dpi);
+        var taskbar = new PxRect(left, 0, left + thickness, 1080);
+        var tray = new PxRect(taskbar.Left, 1080 - TaskbarLayout.Scale(120, dpi), taskbar.Right, 1080);
+        var (width, height) = TaskbarLayout.FitSize(taskbar, edge, dpi);
+
+        var slot = TaskbarLayout.Place(taskbar, tray, edge, 0, width, height);
+
+        Assert.True(slot.Left >= taskbar.Left, $"left {slot.Left}");
+        Assert.True(slot.Right <= taskbar.Right, $"right {slot.Right}");
+        Assert.True(slot.Bottom <= tray.Top, $"bottom {slot.Bottom} tray {tray.Top}");
+        Assert.True(slot.Top >= taskbar.Top);
+        Assert.Equal(TaskbarLayout.Scale(TaskbarLayout.VerticalHeight, dpi), slot.Height);
+        Assert.True(slot.Width < slot.Height * 2);
+    }
+
+    [Theory]
+    [InlineData(BarEdge.Bottom, 1920, 48, 252, 44)]
+    [InlineData(BarEdge.Left, 72, 1080, 64, 128)]
+    [InlineData(BarEdge.Right, 300, 1080, 252, 128)]
+    [InlineData(BarEdge.Left, 30, 1080, 40, 128)]
+    public void FitSize_follows_the_taskbar_orientation(BarEdge edge, int taskbarWidth, int taskbarHeight, int width, int height)
+    {
+        var taskbar = new PxRect(0, 0, taskbarWidth, taskbarHeight);
+
+        Assert.Equal((width, height), TaskbarLayout.FitSize(taskbar, edge, 96));
+    }
+
+    [Fact]
+    public void Beside_steps_aside_a_vertical_taskbar()
+    {
+        var taskbar = new PxRect(0, 0, 72, 1080);
+        var slot = new PxRect(4, 900, 68, 964);
+        var monitor = new PxRect(0, 0, 1920, 1080);
+
+        var lifted = TaskbarLayout.Beside(taskbar, slot, BarEdge.Left, monitor);
+
+        Assert.Equal(taskbar.Right, lifted.Left);
+        Assert.Equal(slot.Top, lifted.Top);
+    }
+
     [Fact]
     public void Beside_steps_above_a_bottom_taskbar_while_start_is_open()
     {

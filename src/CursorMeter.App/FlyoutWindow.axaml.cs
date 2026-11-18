@@ -24,6 +24,9 @@ internal sealed partial class FlyoutWindow : Window
         TransparencyLevelHint = [WindowTransparencyLevel.Mica];
         RefreshButton.Click += (_, _) => RefreshRequested?.Invoke(this, EventArgs.Empty);
         DashboardButton.Click += (_, _) => DashboardRequested?.Invoke(this, EventArgs.Empty);
+        OpenCursorButton.Click += (_, _) => OpenCursorRequested?.Invoke(this, EventArgs.Empty);
+        DownloadCursorButton.Click += (_, _) => DownloadCursorRequested?.Invoke(this, EventArgs.Empty);
+        OpenFirefoxButton.Click += (_, _) => OpenFirefoxRequested?.Invoke(this, EventArgs.Empty);
         LayoutUpdated += (_, _) => Reposition();
         Opened += (_, _) =>
         {
@@ -56,11 +59,78 @@ internal sealed partial class FlyoutWindow : Window
     }
     public event EventHandler? RefreshRequested;
     public event EventHandler? DashboardRequested;
+    public event EventHandler? OpenCursorRequested;
+    public event EventHandler? DownloadCursorRequested;
+    public event EventHandler? OpenFirefoxRequested;
 
     public void ShowState(MeterState state)
     {
+        if (state.Setup is { } setup)
+        {
+            ShowSetup(setup);
+            return;
+        }
+
+        SetupPanel.IsVisible = false;
+        DashboardButton.IsVisible = true;
+        RefreshButton.Content = "Atualizar";
         DetailText.Text = state.Detail;
+        DetailText.MinHeight = 40;
+        SecondaryText.IsVisible = true;
+        SecondaryText.MinHeight = 18;
+        SecondaryText.Margin = new Thickness(0, 0, 0, 16);
         SecondaryText.Text = state.Secondary ?? "";
+    }
+
+    /// <summary>
+    /// No usable session: instead of the status line, the two places the account can be read from,
+    /// what each one is missing and the button that fixes it. Nothing here polls: after the user
+    /// has done it, "Verificar já" reads again.
+    /// </summary>
+    private void ShowSetup(SessionSetup setup)
+    {
+        DetailText.Text = "Ligar a conta do Cursor";
+        DetailText.MinHeight = 0;
+        SecondaryText.Text = "O CursorMeter lê os dados de uma destas fontes. Basta uma.";
+        SecondaryText.MinHeight = 0;
+        SecondaryText.Margin = new Thickness(0, 2, 0, 12);
+        SecondaryText.IsVisible = true;
+        SetupPanel.IsVisible = true;
+        DashboardButton.IsVisible = false;
+        RefreshButton.Content = "Verificar já";
+
+        CursorStatusText.Text = !setup.CursorInstalled ? "✗ não instalado"
+            : setup.CursorHasSession ? "✗ sessão expirada"
+            : "✗ sem sessão";
+        CursorHintText.Text = !setup.CursorInstalled ? "Instala o Cursor e inicia sessão."
+            : setup.CursorHasSession ? "Abre o Cursor e volta a iniciar sessão."
+            : "Abre o Cursor e inicia sessão.";
+        OpenCursorButton.IsVisible = setup.CursorPath is not null;
+        DownloadCursorButton.IsVisible = !setup.CursorInstalled;
+
+        var firefox = setup.Firefox;
+        FirefoxStatusText.Text = setup.FirefoxPath is null && !firefox.ProfileFound ? "✗ não encontrado"
+            : firefox.CookieFound ? "✗ sessão expirada"
+            : "✗ sem sessão";
+        FirefoxHintText.Text = setup.FirefoxPath is null && !firefox.ProfileFound
+            ? "O Firefox não está instalado neste computador."
+            : firefox.CookieFound
+                ? "A sessão em cursor.com expirou. Entra outra vez no Firefox."
+                : "Inicia sessão em cursor.com no Firefox.";
+        string? warning = firefox.ClearsCookiesOnClose
+            ? "⚠ O Firefox apaga os cookies ao fechar, por isso não guarda a sessão. "
+                + "Em Definições › Privacidade e segurança › Cookies, abre \"Gerir exceções\" e permite https://cursor.com. "
+                + "Se for uma política da organização, usa o Cursor."
+            : firefox.AlwaysPrivate
+                ? "⚠ O Firefox está sempre em modo privado, que não guarda a sessão. "
+                    + "Em Definições › Privacidade e segurança › Histórico, escolhe \"Lembrar o histórico\"."
+                : firefox.ProfileFound && !firefox.CookieFound
+                    ? "Se já iniciaste sessão e continua sem funcionar, o Firefox pode não estar a guardar cookies "
+                        + "(limpeza ao fechar, modo privado ou política da organização). Nesse caso, usa o Cursor."
+                    : null;
+        FirefoxWarningText.IsVisible = warning is not null;
+        FirefoxWarningText.Text = warning ?? "";
+        OpenFirefoxButton.IsVisible = setup.FirefoxPath is not null;
     }
 
     public void ShowNear(PixelRect? anchor)

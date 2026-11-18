@@ -18,6 +18,12 @@ public static class TaskbarLayout
     public const int PreferredHeight = 40;
     public const int Gap = 6;
 
+    /// <summary>Height of the two rings on a taskbar at the left or right of the screen, at 96 DPI.</summary>
+    public const int VerticalHeight = 128;
+
+    /// <summary>Narrowest the stacked bars get on a vertical taskbar, at 96 DPI.</summary>
+    public const int VerticalMinWidth = 40;
+
     /// <summary>An auto-hidden taskbar shrinks to a sliver of about two pixels.</summary>
     public const int CollapsedThickness = 16;
 
@@ -37,6 +43,23 @@ public static class TaskbarLayout
         if (taskbarThickness <= 0)
             return Scale(PreferredHeight, dpi);
         return Math.Clamp(taskbarThickness - Scale(4, dpi), Scale(30, dpi), Scale(48, dpi));
+    }
+
+    public static bool IsVertical(BarEdge edge) => edge is BarEdge.Left or BarEdge.Right;
+
+    /// <summary>
+    /// Size of the bars for this taskbar. Along the top or bottom they are one wide strip as high
+    /// as the bar allows. Along the left or right they are stacked, as wide as the bar allows.
+    /// </summary>
+    public static (int Width, int Height) FitSize(PxRect taskbar, BarEdge edge, int dpi)
+    {
+        if (!IsVertical(edge))
+            return (Scale(PreferredWidth, dpi), FitThickness(taskbar.Height, dpi));
+
+        int width = taskbar.Width <= 0
+            ? Scale(PreferredWidth, dpi)
+            : Math.Clamp(taskbar.Width - Scale(8, dpi), Scale(VerticalMinWidth, dpi), Scale(PreferredWidth, dpi));
+        return (width, Scale(VerticalHeight, dpi));
     }
 
     public static bool IsCollapsed(PxRect taskbar)
@@ -75,7 +98,8 @@ public static class TaskbarLayout
                 : new PxRect(taskbar.Right - Math.Min(160, taskbar.Width), taskbar.Top, taskbar.Right, taskbar.Bottom);
         }
 
-        width = Math.Min(width, Math.Max(80, taskbar.Width - 8));
+        int minWidth = IsVertical(edge) ? VerticalMinWidth : 80;
+        width = Math.Min(width, Math.Max(minWidth, taskbar.Width - 8));
         height = Math.Min(Math.Max(28, height), Math.Max(28, taskbar.Height - 4));
 
         int x;

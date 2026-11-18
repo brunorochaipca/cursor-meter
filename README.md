@@ -6,7 +6,7 @@
 
 A edição do CursorMeter para quem usa o **Start11 v1 ou v2** no Windows. Mostra as mesmas duas barras de consumo do Cursor que a edição Island e acrescenta um **modo administrador experimental** que as mantém por cima da barra de tarefas.
 
-**[Ver as releases](https://github.com/brunorochaipca/cursor-meter/releases)** · Windows 10 e 11 · versão beta 1.4.0-beta.2 · [MIT](LICENSE)
+**[Ver as releases](https://github.com/brunorochaipca/cursor-meter/releases)** · Windows 10 e 11 · versão beta 1.4.0-beta.3 · [MIT](LICENSE)
 
 Esta é uma versão de testes. A edição estável é a **Island**, na [branch `main`](https://github.com/brunorochaipca/cursor-meter/blob/main/README.md).
 

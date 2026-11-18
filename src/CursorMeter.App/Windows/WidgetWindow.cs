@@ -84,6 +84,13 @@ internal sealed class WidgetWindow : Window
 
     public int ToPixels(double value) => (int)Math.Round(value * RenderScaling);
 
+    /// <summary>Set while the taskbar is at the left or right of the screen: the bars are drawn stacked.</summary>
+    public bool Vertical
+    {
+        get => _bars.Vertical;
+        set => _bars.Vertical = value;
+    }
+
     /// <summary>
     /// Set while the bars float above the taskbar because the island has no room: they stay faded
     /// until the pointer is over them, so they hide as little as possible of what is behind.
