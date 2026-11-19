@@ -86,7 +86,54 @@ public static class TaskbarLayout
         return Place(taskbar, tray, edge, delta, PreferredWidth, PreferredHeight);
     }
 
+    /// <summary>No limit: the bars may go anywhere along the taskbar.</summary>
+    public const int NoLimit = int.MinValue;
+
+    /// <summary>
+    /// How far along the taskbar the bars must stay clear of what sits at its start: the Start button,
+    /// the search box, Task View. Windows 10 draws those above a child of the taskbar, so bars dragged
+    /// over them vanish. <paramref name="elements"/> are the rectangles of the taskbar's children, in
+    /// the same space as the taskbar. Returns the right edge (bottom edge on a vertical taskbar) of the
+    /// last one, or <see cref="NoLimit"/>. A child that spans most of the taskbar is the container of
+    /// the apps or of a XAML surface, not a button, and is not counted. Neither is anything past the
+    /// middle of the taskbar or beyond the notification area.
+    /// </summary>
+    public static int KeepClearAlong(PxRect taskbar, PxRect tray, BarEdge edge, IEnumerable<PxRect> elements)
+    {
+        if (taskbar.IsEmpty)
+            return NoLimit;
+
+        bool vertical = IsVertical(edge);
+        int length = vertical ? taskbar.Height : taskbar.Width;
+        int start = vertical ? taskbar.Top : taskbar.Left;
+        int trayStart = tray.IsEmpty ? int.MaxValue : vertical ? tray.Top : tray.Left;
+
+        int limit = NoLimit;
+        foreach (var element in elements)
+        {
+            if (element.IsEmpty)
+                continue;
+            int elementStart = vertical ? element.Top : element.Left;
+            int elementEnd = vertical ? element.Bottom : element.Right;
+            int elementLength = elementEnd - elementStart;
+            if (elementLength >= length * 6 / 10
+                || elementStart >= start + (length / 2)
+                || elementEnd > trayStart)
+                continue;
+            limit = Math.Max(limit, elementEnd);
+        }
+
+        return limit;
+    }
+
     public static PxRect Place(PxRect taskbar, PxRect tray, BarEdge edge, int delta, int width, int height)
+        => Place(taskbar, tray, edge, delta, width, height, NoLimit);
+
+    /// <summary>
+    /// Like the overload without a limit. <paramref name="keepClearAlong"/> is the position along the
+    /// taskbar (x, or y on a vertical taskbar) the bars may not go before, see <see cref="KeepClearAlong"/>.
+    /// </summary>
+    public static PxRect Place(PxRect taskbar, PxRect tray, BarEdge edge, int delta, int width, int height, int keepClearAlong)
     {
         if (taskbar.IsEmpty)
             return new PxRect(0, 0, width, height);
@@ -117,8 +164,11 @@ public static class TaskbarLayout
 
         int maxX = Math.Max(taskbar.Left + 2, taskbar.Right - width - 2);
         int maxY = Math.Max(taskbar.Top + 2, taskbar.Bottom - height - 2);
-        x = Math.Clamp(x, taskbar.Left + 2, maxX);
-        y = Math.Clamp(y, taskbar.Top + 2, maxY);
+        bool vertical = edge is BarEdge.Left or BarEdge.Right;
+        int minX = vertical || keepClearAlong == NoLimit ? taskbar.Left + 2 : Math.Min(Math.Max(taskbar.Left + 2, keepClearAlong), maxX);
+        int minY = !vertical || keepClearAlong == NoLimit ? taskbar.Top + 2 : Math.Min(Math.Max(taskbar.Top + 2, keepClearAlong), maxY);
+        x = Math.Clamp(x, minX, maxX);
+        y = Math.Clamp(y, minY, maxY);
         return new PxRect(x, y, x + width, y + height);
     }
 

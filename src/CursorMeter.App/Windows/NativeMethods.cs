@@ -131,6 +131,9 @@ internal static class NativeMethods
     [DllImport("user32.dll")]
     public static extern bool IsWindowVisible(IntPtr hwnd);
 
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    public static extern int GetClassName(IntPtr hwnd, System.Text.StringBuilder className, int maxCount);
+
     [DllImport("user32.dll")]
     public static extern IntPtr GetWindow(IntPtr hwnd, uint command);
 

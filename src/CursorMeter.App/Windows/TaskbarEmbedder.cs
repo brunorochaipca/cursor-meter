@@ -170,7 +170,8 @@ internal sealed class TaskbarEmbedder : IDisposable
             return;
         }
 
-        var screenSlot = TaskbarLayout.Place(taskbarPx, trayPx, edge, _delta, width, height);
+        int keepClear = KeepClearAlong(taskbar, taskbarPx, trayPx, edge);
+        var screenSlot = TaskbarLayout.Place(taskbarPx, trayPx, edge, _delta, width, height, keepClear);
         if (screenSlot.IsEmpty)
         {
             Mode("no room on the taskbar, bars hidden");
@@ -283,9 +284,15 @@ internal sealed class TaskbarEmbedder : IDisposable
         int dpi = DpiOf(taskbar);
         var (width, height) = TaskbarLayout.FitSize(taskbarPx, edge, dpi);
         var natural = TaskbarLayout.Place(taskbarPx, trayPx, edge, 0, width, height);
-        _delta = edge is BarEdge.Left or BarEdge.Right
-            ? screenTop - natural.Top
-            : screenLeft - natural.Left;
+        bool vertical = edge is BarEdge.Left or BarEdge.Right;
+        int wanted = vertical ? screenTop - natural.Top : screenLeft - natural.Left;
+
+        // Dragging past the Start button, search box or Task View stops there, so the offset that is
+        // saved never goes beyond it and the bars follow the pointer again as soon as it comes back.
+        int keepClear = KeepClearAlong(taskbar, taskbarPx, trayPx, edge);
+        if (keepClear != TaskbarLayout.NoLimit)
+            wanted = Math.Max(wanted, keepClear - (vertical ? natural.Top : natural.Left));
+        _delta = wanted;
         WriteDelta(_delta);
         Place();
     }
@@ -826,6 +833,71 @@ internal sealed class TaskbarEmbedder : IDisposable
 
         var scaled = (int)Math.Round(96 * _widget.RenderScaling);
         return scaled >= 96 ? scaled : 96;
+    }
+
+    /// <summary>
+    /// Where the bars may not go before, along the taskbar. Windows 10 puts the Start button, the
+    /// search box and Task View at the start of the taskbar, above a child window of it, so bars
+    /// dragged over them disappear. Windows 11 draws them on its own XAML surface, which is not read here.
+    /// </summary>
+    private int KeepClearAlong(IntPtr taskbar, PxRect taskbarPx, PxRect trayPx, BarEdge edge)
+    {
+        if (OperatingSystem.IsWindowsVersionAtLeast(10, 0, 22000))
+            return TaskbarLayout.NoLimit;
+
+        var elements = new List<PxRect>();
+        var described = new List<string>();
+        IntPtr child = IntPtr.Zero;
+        while ((child = NativeMethods.FindWindowEx(taskbar, child, null, null)) != IntPtr.Zero)
+        {
+            if (child == _widget.Handle
+                || !NativeMethods.IsWindowVisible(child)
+                || !NativeMethods.GetWindowRect(child, out var found))
+                continue;
+
+            var className = new System.Text.StringBuilder(128);
+            NativeMethods.GetClassName(child, className, className.Capacity);
+            var name = className.ToString();
+            var rect = ToPx(found);
+            described.Add($"{name} {Describe(rect)}");
+
+            if (name is "TrayNotifyWnd" or XamlBridgeClass)
+                continue;
+
+            if (name == "ReBarWindow32")
+            {
+                // The apps area starts where Start, search and Task View end: what lies before it is
+                // one stretch to keep clear.
+                bool vertical = TaskbarLayout.IsVertical(edge);
+                int before = vertical ? rect.Top - taskbarPx.Top : rect.Left - taskbarPx.Left;
+                if (before > 0)
+                {
+                    elements.Add(vertical
+                        ? new PxRect(taskbarPx.Left, taskbarPx.Top, taskbarPx.Right, rect.Top)
+                        : new PxRect(taskbarPx.Left, taskbarPx.Top, rect.Left, taskbarPx.Bottom));
+                }
+
+                continue;
+            }
+
+            elements.Add(rect);
+        }
+
+        int limit = TaskbarLayout.KeepClearAlong(taskbarPx, trayPx, edge, elements);
+        LogKeepClear($"keep clear of the start of the taskbar up to {(limit == TaskbarLayout.NoLimit ? "nothing" : limit.ToString())}; "
+            + $"taskbar {Describe(taskbarPx)}, children: {string.Join(", ", described)}");
+        return limit;
+    }
+
+    private string? _lastKeepClear;
+
+    /// <summary>Logs what keeps the bars off the start of the taskbar, only when it changes.</summary>
+    private void LogKeepClear(string text)
+    {
+        if (text == _lastKeepClear)
+            return;
+        _lastKeepClear = text;
+        AppLog.Info("Placement: " + text);
     }
 
     private static IntPtr FindTray(IntPtr taskbar)

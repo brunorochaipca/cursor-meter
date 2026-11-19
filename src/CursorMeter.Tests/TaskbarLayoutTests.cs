@@ -135,4 +135,93 @@ public sealed class TaskbarLayoutTests
         Assert.Equal(client.Width, screen.Width);
         Assert.Equal(client.Height, screen.Height);
     }
+
+    // A Windows 10 taskbar, 1920 wide: Start, the search box and Task View, then the apps, then the tray.
+    private static readonly PxRect Windows10Bar = new(0, 1032, 1920, 1080);
+    private static readonly PxRect Windows10Tray = new(1680, 1032, 1920, 1080);
+    private static readonly PxRect[] Windows10Start =
+    [
+        new(0, 1032, 48, 1080),
+        new(48, 1032, 348, 1080),
+        new(348, 1032, 396, 1080),
+    ];
+
+    [Fact]
+    public void KeepClearAlong_ends_at_the_last_button_before_the_apps()
+    {
+        int limit = TaskbarLayout.KeepClearAlong(Windows10Bar, Windows10Tray, BarEdge.Bottom, Windows10Start);
+
+        Assert.Equal(396, limit);
+    }
+
+    [Fact]
+    public void KeepClearAlong_ignores_what_spans_the_taskbar_the_tray_and_the_far_half()
+    {
+        PxRect[] others =
+        [
+            new(396, 1032, 1680, 1080),
+            new(0, 1032, 1920, 1080),
+            Windows10Tray,
+            new(1000, 1032, 1100, 1080),
+            default,
+        ];
+
+        Assert.Equal(TaskbarLayout.NoLimit, TaskbarLayout.KeepClearAlong(Windows10Bar, Windows10Tray, BarEdge.Bottom, others));
+    }
+
+    [Fact]
+    public void KeepClearAlong_follows_a_vertical_taskbar()
+    {
+        var bar = new PxRect(0, 0, 72, 1080);
+        var tray = new PxRect(0, 960, 72, 1080);
+        PxRect[] buttons = [new(0, 0, 72, 48), new(0, 48, 72, 96)];
+
+        Assert.Equal(96, TaskbarLayout.KeepClearAlong(bar, tray, BarEdge.Left, buttons));
+    }
+
+    [Fact]
+    public void Place_keeps_dragged_bars_off_the_search_box()
+    {
+        int width = 252;
+        int height = 44;
+        int limit = TaskbarLayout.KeepClearAlong(Windows10Bar, Windows10Tray, BarEdge.Bottom, Windows10Start);
+
+        // Dragged all the way to the left of the screen.
+        var free = TaskbarLayout.Place(Windows10Bar, Windows10Tray, BarEdge.Bottom, -5000, width, height);
+        var kept = TaskbarLayout.Place(Windows10Bar, Windows10Tray, BarEdge.Bottom, -5000, width, height, limit);
+
+        Assert.True(free.Left < limit, $"free {free.Left}");
+        Assert.Equal(limit, kept.Left);
+        Assert.Equal(free.Top, kept.Top);
+        Assert.Equal(width, kept.Width);
+    }
+
+    [Fact]
+    public void Place_does_not_move_bars_that_are_already_clear()
+    {
+        var free = TaskbarLayout.Place(Windows10Bar, Windows10Tray, BarEdge.Bottom, -40, 252, 44);
+        var kept = TaskbarLayout.Place(Windows10Bar, Windows10Tray, BarEdge.Bottom, -40, 252, 44, 396);
+
+        Assert.Equal(free, kept);
+    }
+
+    [Fact]
+    public void Place_keeps_vertical_bars_below_the_buttons_at_the_top()
+    {
+        var bar = new PxRect(0, 0, 72, 1080);
+        var tray = new PxRect(0, 960, 72, 1080);
+
+        var kept = TaskbarLayout.Place(bar, tray, BarEdge.Left, -5000, 64, 128, 96);
+
+        Assert.Equal(96, kept.Top);
+    }
+
+    [Fact]
+    public void Place_with_a_limit_beyond_the_room_stays_inside_the_taskbar()
+    {
+        var kept = TaskbarLayout.Place(Windows10Bar, Windows10Tray, BarEdge.Bottom, 0, 252, 44, 5000);
+
+        Assert.True(kept.Right <= Windows10Bar.Right);
+        Assert.True(kept.Left >= Windows10Bar.Left);
+    }
 }

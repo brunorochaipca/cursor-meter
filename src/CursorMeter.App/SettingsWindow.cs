@@ -224,22 +224,61 @@ internal sealed class SettingsWindow : Window
 
     private Control FloatingPage()
     {
+        // Hidden means the user turned the floating bars off. The other choices only apply while they are on.
+        bool on = _hooks.FloatingHidden?.IsChecked?.Invoke() != true;
+
         var faded = Slide(10, 90, Settings.FadedOpacity, "{0}%", value => Change(s => s with { FadedOpacity = value }));
-        var cards = new List<Control>
-        {
-            Note("Quando a ilha das janelas ocupa o espaço, as barras flutuam por cima da barra de tarefas."),
-            Card("Opacidade em repouso", "Quanto se veem as barras flutuantes enquanto o rato não está por cima.", faded),
-        };
-        if (_hooks.FloatingHidden is { } hidden)
-            cards.Add(Card("Esconder as barras flutuantes", "Só vale enquanto não houver espaço para a ilha.", EntryToggle(hidden)));
+        var opacity = Card("Opacidade em repouso", "Quanto se veem as barras flutuantes enquanto o rato não está por cima.", faded);
+        opacity.IsEnabled = on;
+
+        Border? position = null;
         if (_hooks.ResetFloatingPosition is { } reset)
         {
             var button = new Button { Content = "Repor posição", MinWidth = 120, HorizontalContentAlignment = HorizontalAlignment.Center };
             button.Click += (_, _) => reset();
-            cards.Add(Card("Posição", "Volta a pôr as barras flutuantes no canto, por cima da barra de tarefas.", button));
+            position = Card("Posição", "Volta a pôr as barras flutuantes no canto, imediatamente acima da barra de tarefas.", button);
+            position.IsEnabled = on;
         }
 
+        var cards = new List<Control>();
+        if (_hooks.FloatingHidden is { } hidden)
+        {
+            var toggle = FloatingToggle(hidden, enabled =>
+            {
+                opacity.IsEnabled = enabled;
+                if (position is not null)
+                    position.IsEnabled = enabled;
+            });
+            cards.Add(Card(
+                "Barras flutuantes",
+                "Quando a ilha das janelas ocupa o espaço, as barras ficam imediatamente acima da barra de tarefas.",
+                toggle));
+        }
+
+        cards.Add(opacity);
+        if (position is not null)
+            cards.Add(position);
         return Page(cards.ToArray());
+    }
+
+    /// <summary>
+    /// The floating-bars switch. The menu entry is "hide", so the switch is on when they are not hidden.
+    /// </summary>
+    private static ToggleSwitch FloatingToggle(MenuEntry hidden, Action<bool> changed)
+    {
+        bool Shown() => hidden.IsChecked?.Invoke() != true;
+        var toggle = new ToggleSwitch { IsChecked = Shown(), OnContent = "Ligado", OffContent = "Desligado" };
+        toggle.IsCheckedChanged += (_, _) =>
+        {
+            bool wanted = toggle.IsChecked == true;
+            if (Shown() != wanted)
+                hidden.Run();
+            bool actual = Shown();
+            if (actual != wanted)
+                toggle.IsChecked = actual;
+            changed(actual);
+        };
+        return toggle;
     }
 
     private Control GeneralPage()

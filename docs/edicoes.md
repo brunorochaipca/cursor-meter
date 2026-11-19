@@ -5,7 +5,7 @@ O CursorMeter tem duas edições para Windows, com a mesma base de código:
 | Edição | Versão | Para quem | O que faz de diferente |
 |---|---|---|---|
 | **Island** | estável, 1.3.x | Windows 11 com o [Start11 v3](https://www.stardock.com/products/start11/), ou sem Start11 | As barras são mais uma ilha da barra de tarefas. Corre sem permissões de administrador. |
-| **Mainland** | beta, 1.4.0-beta.N | Windows 10 e 11, incluindo o Start11 v1 e v2 | Tudo o que a Island faz, mais um **modo administrador experimental** (UIAccess) que mantém as barras visíveis em cima da barra de tarefas. |
+| **Mainland** | RC, 1.4.0-rc.N | Windows 10 e 11, incluindo o Start11 v1 e v2 | Tudo o que a Island faz, mais um **modo administrador experimental** (UIAccess) que mantém as barras visíveis em cima da barra de tarefas. |
 
 O nome vem das ilhas do Start11 v3. A Island vive nelas. A Mainland é para a barra de tarefas de sempre, o continente, sem ilhas.
 

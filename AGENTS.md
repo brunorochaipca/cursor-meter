@@ -14,7 +14,7 @@ Este projeto tem **duas edições** do CursorMeter para Windows, cada uma na sua
 | Edição | Branch | Pasta habitual | Para quem | Versões |
 |---|---|---|---|---|
 | **Island** (estável) | `main` | `cursor-meter-island` | Start11 v3 e barra nativa | `1.3.x` |
-| **Mainland** (beta) | `mainland` | `cursor-meter` | Start11 v1/v2, com modo administrador experimental (UIAccess) | `1.4.0-beta.N` |
+| **Mainland** (beta) | `mainland` | `cursor-meter` | Start11 v1/v2, com modo administrador experimental (UIAccess) | `1.4.0-rc.N` |
 
 Se a pasta e a branch não corresponderem à edição pretendida, **não mudes de branch dentro da pasta**. Diz ao programador para abrir a pasta certa (ou propõe criar um `git worktree`).
 
@@ -41,7 +41,7 @@ Quando o programador pede para **publicar uma release**, isso inclui **fazer com
    - Corre `scripts\build-installer.ps1` dentro dela. O instalador fica em `cursor-meter-rel\dist\CursorMeter-Setup-<versão>.exe`.
 5. Cria a etiqueta e a release no GitHub a apontar para esse commit (`gh release create ... --target <branch>`), com as notas em português e o instalador de `cursor-meter-rel\dist` como anexo:
    - **Island:** etiqueta `v1.3.x`, release normal, branch `main`.
-   - **Mainland:** etiqueta `v1.4.0-beta.N`, `--prerelease --latest=false`, branch `mainland`.
+   - **Mainland:** etiqueta `v1.4.0-rc.N`, `--prerelease --latest=false`, branch `mainland`.
 6. Nas notas, diz o que foi testado e o que não foi.
 
 Se a versão pedida já existir como release, não a substituas: pergunta ao programador.
