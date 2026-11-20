@@ -283,10 +283,23 @@ public static class FirefoxSession
         }
 
         var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile, Environment.SpecialFolderOption.DoNotVerify);
+        foreach (var root in LinuxProfileRoots(home, appData))
+            yield return root;
+    }
+
+    /// <summary>
+    /// Where Firefox keeps its profiles on Linux: the distro package, the Ubuntu snap and the Flatpak.
+    /// Recent Flatpak builds follow the XDG layout inside the sandbox
+    /// (<c>~/.var/app/org.mozilla.firefox/config/mozilla/firefox</c>); older ones still use <c>.mozilla/firefox</c>.
+    /// </summary>
+    public static IEnumerable<string> LinuxProfileRoots(string home, string configHome)
+    {
+        var flatpak = Path.Combine(home, ".var", "app", "org.mozilla.firefox");
         yield return Path.Combine(home, ".mozilla", "firefox");
         yield return Path.Combine(home, "snap", "firefox", "common", ".mozilla", "firefox");
-        yield return Path.Combine(home, ".var", "app", "org.mozilla.firefox", ".mozilla", "firefox");
-        yield return Path.Combine(appData, "mozilla", "firefox");
+        yield return Path.Combine(flatpak, ".mozilla", "firefox");
+        yield return Path.Combine(flatpak, "config", "mozilla", "firefox");
+        yield return Path.Combine(configHome, "mozilla", "firefox");
     }
 
     /// <summary>
