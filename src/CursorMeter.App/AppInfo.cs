@@ -30,8 +30,8 @@ internal static class AppInfo
     /// <summary>True for the Mainland edition, the only one that carries the experimental administrator mode.</summary>
     public static bool IsMainland => Edition == "Mainland";
 
-    /// <summary>Product name followed by the edition, for the About window and reports.</summary>
-    public static string Product => $"CursorMeter {Edition}";
+    /// <summary>Product name, for the About window and reports.</summary>
+    public static string Product => "CursorMeter";
 
     public static string Platform => $"{RuntimeInformation.OSDescription}, {RuntimeInformation.FrameworkDescription}";
 

@@ -79,7 +79,7 @@ internal sealed partial class AboutWindow : Window
     {
         var title = Uri.EscapeDataString($"Registos do {AppInfo.Product} {AppInfo.Version}");
         var body = Uri.EscapeDataString(
-            $"Edição: {AppInfo.Edition}\nVersão: {AppInfo.Version}\nSistema: {AppInfo.Platform}\n\nO que aconteceu:\n\n\nRegisto (cola aqui, já está na área de transferência):\n\n```\n\n```\n");
+            $"Versão: {AppInfo.Version}\nSistema: {AppInfo.Platform}\n\nO que aconteceu:\n\n\nRegisto (cola aqui, já está na área de transferência):\n\n```\n\n```\n");
         return AppInfo.TryOpen($"{AppInfo.Repository}/issues/new?title={title}&body={body}");
     }
 

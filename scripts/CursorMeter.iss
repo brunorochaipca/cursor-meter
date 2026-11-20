@@ -1,11 +1,6 @@
 ﻿; Per-user installer. The program lives in LocalAppData\Programs so it does not
 ; share a folder with %LOCALAPPDATA%\CursorMeter\offset.txt.
 
-; This branch is the Mainland edition: beta for Start11 v1/v2 with the experimental administrator
-; mode. The stable Island edition lives on main and shares the AppId, so one replaces the other.
-#ifndef Edition
-  #define Edition "Mainland"
-#endif
 #ifndef AppVersion
   #define AppVersion "1.0.0"
 #endif
@@ -22,9 +17,9 @@
 
 [Setup]
 AppId={{B7E4C1A2-9D35-4F68-8A10-6C2E5D9B4F71}
-AppName={#MyAppName} {#Edition}
+AppName={#MyAppName}
 AppVersion={#AppVersion}
-AppVerName={#MyAppName} {#Edition} {#AppVersion}
+AppVerName={#MyAppName} {#AppVersion}
 AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}/issues
@@ -38,7 +33,7 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 MinVersion=10.0
 OutputDir=..\dist
-OutputBaseFilename=CursorMeter-{#Edition}-Setup-{#AppVersion}
+OutputBaseFilename=CursorMeter-Setup-{#AppVersion}
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
@@ -47,9 +42,9 @@ RestartApplications=no
 AppMutex=Local\CursorMeter
 SetupIconFile=..\assets\CursorMeter.ico
 UninstallDisplayIcon={app}\{#MyAppName}.exe
-UninstallDisplayName={#MyAppName} {#Edition}
+UninstallDisplayName={#MyAppName}
 VersionInfoVersion={#VersionInfoVersion}
-VersionInfoProductName={#MyAppName} {#Edition}
+VersionInfoProductName={#MyAppName}
 VersionInfoDescription=Duas barras na barra de tarefas: Cursor Models e Other Models.
 
 [Languages]
@@ -82,7 +77,7 @@ const
   ChoiceNone = -1;
   ChoiceWithoutAdmin = 0;
   ChoiceWithAdmin = 1;
-  // Same two slots when a Mainland install already exists: update it, or uninstall it first.
+  // Same two slots when an install with administrator mode already exists: update it, or uninstall it first.
   ChoiceUpdate = 0;
   ChoiceUninstallFirst = 1;
 
@@ -98,8 +93,8 @@ var
   Start11Version: String;
   ExperimentalAdminChosen: Boolean;
   PrivilegedStepDone: Boolean;
-  // A Mainland install is already there. ExistingAdmin: it runs in administrator mode.
-  ExistingMainland: Boolean;
+  // A version with the administrator-mode step is already installed. ExistingAdmin: it runs in administrator mode.
+  ExistingInstall: Boolean;
   ExistingAdmin: Boolean;
   ExistingDir: String;
   AdminSelection: Integer;
@@ -185,22 +180,34 @@ begin
     and (ResultCode = 0);
 end;
 
-// True when the Mainland edition is installed. Island shares the AppId but not the display name.
-function MainlandInstalled: Boolean;
+// True when a version with the administrator-mode step is installed: 1.4.0 and later, and the
+// earlier pre-releases, which were named "CursorMeter Mainland". Older versions (1.3.x) share the
+// AppId but have no such step, so they are replaced as a fresh install.
+function InstallPresent: Boolean;
 var
-  DisplayName: String;
+  DisplayName, DisplayVersion: String;
+  Packed: Int64;
 begin
-  Result := RegQueryStringValue(HKCU, UninstallKey, 'DisplayName', DisplayName)
-    and (Pos('Mainland', DisplayName) > 0);
+  Result := False;
+  if not RegQueryStringValue(HKCU, UninstallKey, 'DisplayName', DisplayName) then
+    Exit;
+  if Pos('Mainland', DisplayName) > 0 then
+  begin
+    Result := True;
+    Exit;
+  end;
+  if RegQueryStringValue(HKCU, UninstallKey, 'DisplayVersion', DisplayVersion)
+    and StrToVersion(DisplayVersion, Packed) then
+    Result := ComparePackedVersion(Packed, PackVersionComponents(1, 4, 0, 0)) >= 0;
 end;
 
-// Fills ExistingMainland, ExistingAdmin and ExistingDir from the current install, if any.
+// Fills ExistingInstall, ExistingAdmin and ExistingDir from the current install, if any.
 procedure DetectExistingInstall;
 begin
-  ExistingMainland := MainlandInstalled;
+  ExistingInstall := InstallPresent;
   ExistingAdmin := False;
   ExistingDir := '';
-  if not ExistingMainland then
+  if not ExistingInstall then
     Exit;
   if RegQueryStringValue(HKCU, UninstallKey, 'Inno Setup: App Path', ExistingDir) then
     ExistingAdmin := FileExists(AddBackslash(ExistingDir) + 'experimental-admin') and CursorMeterTaskExists;
@@ -236,7 +243,7 @@ begin
   Chosen := AdminSelection <> ChoiceNone;
   if OnReady then
   begin
-    if not ExistingMainland then
+    if not ExistingInstall then
       WizardForm.NextButton.Caption := SetupMessage(msgButtonInstall)
     else if AdminSelection = ChoiceUninstallFirst then
       WizardForm.NextButton.Caption := 'Desinstalar'
@@ -246,7 +253,7 @@ begin
     WizardForm.NextButton.Enabled := Chosen;
     // The shield marks the click that raises a UAC: Instalar in admin mode, or Desinstalar when the
     // installed version has an elevated task to remove.
-    if ExistingMainland then
+    if ExistingInstall then
       SetInstallShield(Chosen and (AdminSelection = ChoiceUninstallFirst) and ExistingAdmin)
     else
       SetInstallShield(Chosen and (AdminSelection = ChoiceWithAdmin));
@@ -273,7 +280,7 @@ begin
   UpdatingChoice := True;
   try
     AdminSelection := Index;
-    if ExistingMainland then
+    if ExistingInstall then
       // Updating keeps the installed mode; uninstalling first starts from scratch.
       ExperimentalAdminChosen := (Index = ChoiceUpdate) and ExistingAdmin
     else
@@ -533,7 +540,7 @@ begin
     Result := RunPrivilegedBody(CreateTaskBody(Mode), ErrorCode);
 end;
 
-// Cards for an existing Mainland install: update it (keeps the mode) or uninstall it first.
+// Cards for an existing install: update it (keeps the mode) or uninstall it first.
 procedure CreateExistingChoice;
 var
   ModeText, UpdateText, UninstallText: String;
@@ -552,7 +559,7 @@ begin
   AdminInfo.AutoSize := False;
   AdminInfo.WordWrap := True;
   AdminInfo.Caption :=
-    'O CursorMeter Mainland já está instalado, ' + ModeText + '. Para mudar o modo de administrador ' +
+    'O CursorMeter já está instalado, ' + ModeText + '. Para mudar o modo de administrador ' +
     'é preciso desinstalar primeiro a versão instalada.';
 
   UpdateText := 'Mantém a instalação ' + ModeText + '. Não pede permissão de administrador.';
@@ -567,7 +574,7 @@ end;
 
 procedure UpdateReadyPageText;
 begin
-  if ExistingMainland then
+  if ExistingInstall then
   begin
     WizardForm.PageNameLabel.Caption := 'O CursorMeter já está instalado';
     WizardForm.PageDescriptionLabel.Caption := 'Escolha se atualiza ou se desinstala primeiro a versão instalada.';
@@ -606,7 +613,7 @@ begin
       '). Nada foi desinstalado.', mbError, MB_OK);
 end;
 
-// Uninstalls the installed Mainland. With administrator mode the UAC comes first, as soon as the
+// Uninstalls the installed version. With administrator mode the UAC comes first, as soon as the
 // button is clicked, and the uninstaller only runs once the task is gone. Shows its own messages.
 function UninstallExisting: Boolean;
 var
@@ -634,12 +641,12 @@ begin
   end;
   // The uninstaller can hand over to a temporary copy and return early; wait until it is gone.
   Waited := 0;
-  while MainlandInstalled and (Waited < 120000) do
+  while InstallPresent and (Waited < 120000) do
   begin
     Sleep(250);
     Waited := Waited + 250;
   end;
-  if MainlandInstalled then
+  if InstallPresent then
   begin
     MsgBox(UninstallFailedMessage, mbError, MB_OK);
     Exit;
@@ -660,7 +667,7 @@ begin
   for I := 0 to 1 do
     CardPanel[I].Visible := False;
   AdminInfo.Visible := False;
-  ExistingMainland := False;
+  ExistingInstall := False;
   ExistingAdmin := False;
   ExperimentalAdminChosen := False;
   PrivilegedStepDone := False;
@@ -688,7 +695,7 @@ begin
   UpdatingChoice := False;
   NextButtonLeft := WizardForm.NextButton.Left;
   NextButtonWidth := WizardForm.NextButton.Width;
-  if ExistingMainland then
+  if ExistingInstall then
     CreateExistingChoice
   else
     CreateAdminChoice;
@@ -699,7 +706,7 @@ end;
 function ShouldSkipPage(PageID: Integer): Boolean;
 begin
   Result := False;
-  if not ExistingMainland then
+  if not ExistingInstall then
     Exit;
   if PageID = wpSelectDir then
     Result := True
@@ -733,7 +740,7 @@ begin
     Exit;
   end;
 
-  if ExistingMainland then
+  if ExistingInstall then
   begin
     if AdminSelection = ChoiceUninstallFirst then
     begin
@@ -782,8 +789,8 @@ var
 begin
   if CurStep = ssInstall then
   begin
-    // A previous experimental install (Mainland) left a marker and an elevated logon task.
-    // Drop them unless this install opts in again, so the other edition never starts elevated.
+    // A previous install in administrator mode left a marker and an elevated logon task.
+    // Drop them unless this install opts in again, so it never starts elevated by accident.
     MarkerPath := ExpandConstant('{app}\experimental-admin');
     if FileExists(MarkerPath) then
     begin

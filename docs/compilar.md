@@ -8,12 +8,7 @@ Com o [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) e o [Inno S
 .\scripts\build-windows.ps1
 ```
 
-Cada edição vive na sua branch, e cada branch compila só a sua edição:
-
-| Edição | Branch | Executável (em `src\CursorMeter.App\bin\Release\net8.0\win-x64\`) | Instalador (de `.\scripts\build-installer.ps1`) |
-|---|---|---|---|
-| Island | `main` | `publish\CursorMeter.exe` | `dist\CursorMeter-Setup-<versão>.exe` |
-| Mainland | `mainland` | `publish-mainland\CursorMeter.exe` | `dist\CursorMeter-Mainland-Setup-<versão>.exe` |
+O executável fica em `src\CursorMeter.App\bin\Release\net8.0\win-x64\publish\CursorMeter.exe`. Para o instalador, corre `.\scripts\build-installer.ps1`: sai em `dist\CursorMeter-Setup-<versão>.exe`.
 
 ## Zorin OS
 
