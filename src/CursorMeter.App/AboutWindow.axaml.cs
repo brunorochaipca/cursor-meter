@@ -15,7 +15,7 @@ internal sealed partial class AboutWindow : Window
         InitializeComponent();
         Icon = AppIcon.Create();
         Logo.Source = AppIcon.Render(128);
-        VersionText.Text = $"Edição {AppInfo.Edition} · versão {AppInfo.Version}"
+        VersionText.Text = $"Versão {AppInfo.Version}"
             + (OperatingSystem.IsWindows() && Windows.UiAccess.IsActive ? " · modo administrador experimental" : "");
         LogPathText.Text = AppLog.FilePath;
 

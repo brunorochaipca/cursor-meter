@@ -2,43 +2,60 @@
   <img src="assets/logo.png" alt="Logótipo do CursorMeter" width="128">
 </p>
 
-# CursorMeter Mainland (beta)
+# CursorMeter
 
-A edição do CursorMeter para quem usa o **Start11 v1 ou v2** no Windows. Mostra as mesmas duas barras de consumo do Cursor que a edição Island e acrescenta um **modo administrador experimental** que as mantém por cima da barra de tarefas.
+Vê o consumo do Cursor sem abrir o painel Usage: duas barras discretas, uma por pool de quota, sempre à vista.
 
-**[Ver as releases](https://github.com/brunorochaipca/cursor-meter/releases)** · Windows 10 e 11 · versão RC 1.4.0-rc.1 · [MIT](LICENSE)
+**[Transferir a última versão](https://github.com/brunorochaipca/cursor-meter/releases/latest)** · Windows 10 e 11 · Zorin OS · [MIT](LICENSE)
 
-Esta é uma versão de testes. A edição estável é a **Island**, na [branch `main`](https://github.com/brunorochaipca/cursor-meter/blob/main/README.md).
+## O que mostra
 
-## Porque existe
+- **Cursor Models:** a quota do ciclo atual para esse pool (`autoPercentUsed`).
+- **Other Models:** a quota do ciclo atual para os restantes modelos (`apiPercentUsed`).
 
-Nestas versões do Start11, depois de abrir e fechar o menu Iniciar ou a Vista de Tarefas **com o rato**, a barra de tarefas fica por cima das barras do CursorMeter até ao próximo clique (com a tecla do Windows não acontece). O modo administrador experimental (UIAccess) resolve-o. Com o Start11 v3 ou sem Start11, usa a Island.
+São as mesmas duas percentagens do painel Usage. Clica nas barras para ver o resumo, e usa o botão direito para atualizar, abrir o painel ou mudar as definições.
 
 ## Instalar
 
-1. Nas [releases](https://github.com/brunorochaipca/cursor-meter/releases), transfere `CursorMeter-Mainland-Setup-<versão>.exe` (está marcada como pré-lançamento).
-2. Corre-o. O Windows pode dizer que o publicador é desconhecido, porque o instalador não está assinado: escolhe **Mais informações** e depois **Executar mesmo assim**.
-3. No passo **Selecione o modo de instalação**, escolhe se o CursorMeter pede permissão de administrador. Se for detetado um Start11 anterior ao v3, esse passo recomenda o modo administrador e explica porquê. Com essa opção, o botão **Instalar** mostra o escudo do UAC e pede a permissão.
-4. Se o CursorMeter Mainland já estiver instalado, esse passo só oferece **Atualizar** (mantém o modo atual, sem pedir permissão) ou **Desinstalar primeiro** a versão instalada, para poderes escolher outro modo.
+### Windows
 
-## Cuidados
+1. Transfere o instalador (`.exe`) da [última release](https://github.com/brunorochaipca/cursor-meter/releases/latest).
+2. Corre-o. O Windows pode dizer que o publicador é desconhecido, porque o instalador não está assinado: escolhe **Mais informações** e depois **Executar mesmo assim**.
+3. No passo **Selecione o modo de instalação**, escolhe se o CursorMeter pede permissão de administrador (ver abaixo). Se for detetado um Start11 anterior ao v3, esse passo recomenda o modo administrador e explica porquê.
+4. Garante que o Cursor tem a sessão iniciada. As barras aparecem sozinhas na barra de tarefas.
+
+Se o CursorMeter já estiver instalado, esse passo só oferece **Atualizar** (mantém o modo atual, sem pedir permissão) ou **Desinstalar primeiro**, para poderes escolher outro modo.
+
+### Zorin OS
+
+Pacote de 64 bits, sem sudo e sem precisar do .NET. Ver [Zorin OS](docs/zorin.md).
+
+## Modo administrador (experimental)
+
+Com o **Start11 v1 ou v2**, depois de abrir e fechar o menu Iniciar ou a Vista de Tarefas **com o rato**, a barra de tarefas fica por cima das barras do CursorMeter até ao próximo clique (com a tecla do Windows não acontece). O modo administrador experimental (UIAccess) resolve-o. Com o Start11 v3 ou sem Start11 não é preciso.
 
 - **Pede permissão de administrador** (UAC) uma vez, ao clicar em Instalar. A permissão fica numa Tarefa Agendada, e o CursorMeter arranca por ela sem voltar a pedir o UAC, ao abri-lo ou ao iniciar sessão.
-- **É experimental.** Se o UIAccess não ficar ativo, a app continua sem ele, como a Island, e o motivo fica no registo.
-- **Instalar a Mainland substitui a Island**, e vice-versa. Nunca correm as duas ao mesmo tempo.
+- **É experimental.** Se o UIAccess não ficar ativo, a app continua sem ele, e o motivo fica no registo.
 - **Para desligar o modo** sem desinstalar: apaga `experimental-admin` na pasta do programa e a tarefa `CursorMeter` no Agendador de Tarefas.
 
 Como funciona por dentro: [modo administrador experimental](docs/mainland.md).
 
-## Tudo o resto
+## Privacidade
 
-As definições, as ilhas, as barras flutuantes, e a privacidade são iguais aos da Island. Ver o [README da Island](https://github.com/brunorochaipca/cursor-meter/blob/main/README.md) e a pasta [docs](docs):
+Lê a sessão que o próprio Cursor gravou ao iniciares sessão, em `%APPDATA%\Cursor\User\globalStorage\state.vscdb`. Se essa sessão expirar, usa a sessão de cursor.com que estiver no Firefox. Não envia nada para além do pedido de uso ao próprio Cursor.
 
-- [Windows e Start11](docs/windows.md)
-- [Zorin OS](docs/zorin.md)
-- [As duas edições](docs/edicoes.md)
+## Algo não aparece?
+
+Botão direito nas barras, **Acerca de**, **Enviar registos**: copia o registo e abre uma issue no GitHub. Mais ajuda em [resolução de problemas](docs/resolucao-de-problemas.md).
+
+## Saber mais
+
+- [Windows e Start11](docs/windows.md): ilhas, barras flutuantes, definições e modo sem ilhas.
+- [Zorin OS](docs/zorin.md): a extensão do GNOME Shell, cliques e onde procura a sessão.
 - [Resolução de problemas](docs/resolucao-de-problemas.md)
 - [Compilar a partir do código](docs/compilar.md)
+
+O Start11 é um produto da Stardock, pago e independente deste projeto. O CursorMeter não o inclui nem tem qualquer ligação à Stardock.
 
 ## Licença
 
