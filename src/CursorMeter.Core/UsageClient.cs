@@ -15,6 +15,9 @@ public sealed class UsageClient : IDisposable
     private readonly HttpClient _http;
     private readonly bool _ownsClient;
 
+    /// <summary>ExtraSpend. Sees the usage JSON before it is parsed. Null until the minute graph subscribes.</summary>
+    public static Action<string>? UsageObserved;
+
     public UsageClient()
         : this(new SocketsHttpHandler
         {
@@ -71,6 +74,37 @@ public sealed class UsageClient : IDisposable
         if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
             throw new CursorAuthException("A sessão do Firefox em cursor.com expirou. Volta a entrar.");
         return await ReadUsageAsync(response, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>ExtraSpend. One page of the usage list, the same request as cursor.com/dashboard/usage.</summary>
+    public async Task<string> FetchUsageEventsAsync(
+        string sessionCookie, long startMs, long endMs, int page, int pageSize, CancellationToken cancellationToken = default)
+    {
+        if (!IsUsableCookie(sessionCookie))
+            throw new CursorAuthException("A sessão em cursor.com não é válida.");
+
+        var body = JsonSerializer.Serialize(new
+        {
+            teamId = 0,
+            startDate = startMs,
+            endDate = endMs,
+            page,
+            pageSize,
+        });
+        using var request = new HttpRequestMessage(HttpMethod.Post, "https://cursor.com/api/dashboard/get-filtered-usage-events")
+        {
+            Content = new StringContent(body, Encoding.UTF8, "application/json"),
+        };
+        request.Headers.TryAddWithoutValidation("Cookie", FirefoxSession.CookieName + "=" + sessionCookie.Trim());
+        request.Headers.TryAddWithoutValidation("Origin", "https://cursor.com");
+        request.Headers.TryAddWithoutValidation("Referer", "https://cursor.com/dashboard/usage");
+        request.Headers.Accept.ParseAdd("application/json");
+        using var response = await _http.SendAsync(request, cancellationToken).ConfigureAwait(false);
+        if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+            throw new CursorAuthException("A sessão em cursor.com expirou.");
+        if (!response.IsSuccessStatusCode)
+            throw new CursorUsageException($"O Cursor não devolveu a utilização do dia ({(int)response.StatusCode}).");
+        return await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
     }
 
     private static bool IsUsableCookie(string? value)
@@ -134,6 +168,15 @@ public sealed class UsageClient : IDisposable
             throw new CursorUsageException($"O Cursor não devolveu a utilização ({(int)response.StatusCode}).");
 
         var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            UsageObserved?.Invoke(json); // ExtraSpend
+        }
+        catch (Exception)
+        {
+            // ExtraSpend must not break the quota read.
+        }
+
         try
         {
             return UsageParser.Parse(json);

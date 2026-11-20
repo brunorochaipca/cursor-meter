@@ -67,6 +67,12 @@ public sealed record AppSettings
     public int WarnAt { get; init; } = DefaultWarnAt;
     public int HotAt { get; init; } = DefaultHotAt;
 
+    /// <summary>ExtraSpend. Daily extra-plan ceiling in whole dollars. Zero keeps the minute graph in the normal colour.</summary>
+    public int ExtraCeiling { get; init; }
+
+    /// <summary>ExtraSpend. Minutes the minute graph stays open after the last consumption, when a consumption opened it.</summary>
+    public int ExtraKeepMinutes { get; init; } = 2;
+
     /// <summary>Opacity of the floating bars until the pointer is over them, in percent.</summary>
     public int FadedOpacity { get; init; } = 40;
 
@@ -98,6 +104,8 @@ public sealed record AppSettings
             RefreshMinutes = Math.Clamp(RefreshMinutes, 1, 60),
             WarnAt = warn,
             HotAt = Math.Clamp(HotAt, warn + 1, 100),
+            ExtraCeiling = Math.Clamp(ExtraCeiling, 0, 500), // ExtraSpend
+            ExtraKeepMinutes = Math.Clamp(ExtraKeepMinutes, 1, 60), // ExtraSpend
             FadedOpacity = Math.Clamp(FadedOpacity, 10, 90),
             TextColor = NormalizeColor(TextColor),
             MutedColor = NormalizeColor(MutedColor),
@@ -146,6 +154,8 @@ public sealed record AppSettings
             RefreshMinutes = Number(values, nameof(RefreshMinutes), defaults.RefreshMinutes),
             WarnAt = Number(values, nameof(WarnAt), defaults.WarnAt),
             HotAt = Number(values, nameof(HotAt), defaults.HotAt),
+            ExtraCeiling = Number(values, nameof(ExtraCeiling), defaults.ExtraCeiling), // ExtraSpend
+            ExtraKeepMinutes = Number(values, nameof(ExtraKeepMinutes), defaults.ExtraKeepMinutes), // ExtraSpend
             FadedOpacity = Number(values, nameof(FadedOpacity), defaults.FadedOpacity),
             Outline = Flag(values, nameof(Outline), defaults.Outline),
             GlideBars = Flag(values, nameof(GlideBars), defaults.GlideBars),
@@ -183,6 +193,8 @@ public sealed record AppSettings
         Line(nameof(RefreshMinutes), s.RefreshMinutes);
         Line(nameof(WarnAt), s.WarnAt);
         Line(nameof(HotAt), s.HotAt);
+        Line(nameof(ExtraCeiling), s.ExtraCeiling); // ExtraSpend
+        Line(nameof(ExtraKeepMinutes), s.ExtraKeepMinutes); // ExtraSpend
         Line(nameof(FadedOpacity), s.FadedOpacity);
         Line(nameof(GlideBars), s.GlideBars ? 1 : 0);
         Line(nameof(TextColor), s.TextColor);

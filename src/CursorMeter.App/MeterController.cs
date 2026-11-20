@@ -4,6 +4,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Threading;
+using CursorMeter.App.ExtraSpend;
 using CursorMeter.App.Linux;
 using CursorMeter.App.Windows;
 
@@ -35,10 +36,17 @@ internal sealed class MeterController : IDisposable
     private bool _refreshing;
     private bool _disposed;
 
+    private readonly ExtraSpendFeature _extra; // ExtraSpend
+    private DateTime _eventsDeniedUntil; // ExtraSpend
+    private DateOnly _eventsWholeDay; // ExtraSpend
+    private DateTime _eventsWholeAt; // ExtraSpend
+
     public MeterController(IClassicDesktopStyleApplicationLifetime lifetime)
     {
         _lifetime = lifetime;
         var menu = CreateMenu();
+        // ExtraSpend: the minute graph, shown instead of the summary.
+        _extra = new ExtraSpendFeature(PollExtraAsync, ExtraAnchor, CloseSummary, NoteFlyoutClosed);
 
         if (OperatingSystem.IsLinux())
         {
@@ -76,6 +84,7 @@ internal sealed class MeterController : IDisposable
         _usageTimer.Start();
         SettingsStore.Changed += OnSettingsChanged;
         _ = RefreshAsync();
+        _extra.Start(); // ExtraSpend
     }
 
     public void Dispose()
@@ -84,6 +93,7 @@ internal sealed class MeterController : IDisposable
             return;
         _disposed = true;
         SettingsStore.Changed -= OnSettingsChanged;
+        _extra.Dispose(); // ExtraSpend
         _usageTimer.Stop();
         _flyout?.Close();
         _about?.Close();
@@ -103,6 +113,7 @@ internal sealed class MeterController : IDisposable
             menu.Add(new("Mostrar resumo", ToggleFlyout));
         menu.Add(new("Atualizar", () => _ = RefreshAsync()));
         menu.Add(new("Painel do Cursor", OpenDashboard));
+        menu.Add(new("Consumo extra", () => _extra.Show())); // ExtraSpend
         menu.Add(new("Definições…", ShowSettings));
         if (OperatingSystem.IsWindows())
         {
@@ -234,9 +245,11 @@ internal sealed class MeterController : IDisposable
             return;
 
         var flyout = new FlyoutWindow();
+        _extra.Close(); // ExtraSpend: the summary takes the place of the graph
         flyout.RefreshRequested += (_, _) => _ = RefreshAsync();
         flyout.DashboardRequested += (_, _) => OpenDashboard();
         flyout.OpenCursorRequested += (_, _) => _state.Setup?.OpenCursor();
+        flyout.RealtimeRequested += (_, _) => _extra.Show(); // ExtraSpend
         flyout.DownloadCursorRequested += (_, _) => SessionSetup.OpenDownload();
         flyout.OpenFirefoxRequested += (_, _) => _state.Setup?.OpenFirefox();
         flyout.Closed += (_, _) =>
@@ -251,6 +264,113 @@ internal sealed class MeterController : IDisposable
         // extension's bars in the taskbar, and the card opens centred above them.
         var panelAnchor = _taskbar is null && _panelFeed?.ExtensionActive == true ? _panelFeed.ReadAnchor() : null;
         flyout.ShowNear(_taskbar?.Anchor ?? panelAnchor, centered: panelAnchor is not null);
+    }
+
+    // ExtraSpend. Delete with the ExtraSpend folders.
+    private (PixelRect? Anchor, bool Centered) ExtraAnchor()
+    {
+        if (_taskbar?.Anchor is { } bars)
+            return (bars, false);
+        var panel = _panelFeed?.ExtensionActive == true ? _panelFeed.ReadAnchor() : null;
+        return (panel, panel is not null);
+    }
+
+    private void CloseSummary() => _flyout?.Close();
+
+    private void NoteFlyoutClosed() => _flyoutClosedAt = DateTime.UtcNow;
+
+    private async Task PollExtraAsync()
+    {
+        if (_refreshing || _disposed)
+            return;
+
+        var session = CursorSession.TryLoadDefault();
+        try
+        {
+            if (session is not null)
+            {
+                try
+                {
+                    await _client.FetchAsync(session).ConfigureAwait(false);
+                }
+                catch (CursorAuthException)
+                {
+                    await FetchWebPeriodAsync().ConfigureAwait(false);
+                }
+            }
+            else
+            {
+                await FetchWebPeriodAsync().ConfigureAwait(false);
+            }
+        }
+        catch (Exception ex) when (ex is CursorAuthException or CursorUsageException)
+        {
+        }
+
+        await FetchTodayChargesAsync(session).ConfigureAwait(false);
+    }
+
+    private async Task FetchWebPeriodAsync()
+    {
+        var cookie = FirefoxSession.TryLoadDefault();
+        if (cookie is null)
+            return;
+        await _client.FetchWebAsync(cookie).ConfigureAwait(false);
+    }
+
+    // ExtraSpend. The usage list for today, same request as cursor.com/dashboard/usage.
+    private async Task FetchTodayChargesAsync(CursorSession? session)
+    {
+        if (DateTime.UtcNow < _eventsDeniedUntil || _disposed)
+            return;
+
+        var cookie = FirefoxSession.TryLoadDefault();
+        if (string.IsNullOrWhiteSpace(cookie))
+            cookie = session?.AccessToken;
+        if (string.IsNullOrWhiteSpace(cookie) || cookie.Contains(';') || cookie.Contains('\r') || cookie.Contains('\n'))
+            return;
+
+        var now = DateTimeOffset.Now;
+        var start = new DateTimeOffset(now.Date, now.Offset);
+        var charges = new List<ExtraCharge>();
+        DateTimeOffset? coveredFrom = null;
+        try
+        {
+            // The newest page is read every time. The rest of the day (a busy day has hundreds of rows)
+            // is read once and then every few minutes, and in between it is kept from the last full read.
+            bool wholeDay = _eventsWholeDay != DateOnly.FromDateTime(now.Date)
+                || DateTime.UtcNow - _eventsWholeAt > TimeSpan.FromMinutes(5);
+            for (int page = 1; page <= 20; page++)
+            {
+                var json = await _client.FetchUsageEventsAsync(
+                    cookie, start.ToUnixTimeMilliseconds(), now.ToUnixTimeMilliseconds(), page, 100).ConfigureAwait(false);
+                var read = ExtraSpendEvents.ReadPage(json);
+                if (read is not { } batch)
+                    return;
+                charges.AddRange(batch.Charges);
+                // A short page is the last one. Count the rows, not the charges: most rows are included in the plan.
+                if (batch.Rows < 100)
+                    break;
+                if (!wholeDay)
+                {
+                    coveredFrom = batch.Oldest;
+                    break;
+                }
+            }
+
+            if (wholeDay && coveredFrom is null)
+            {
+                _eventsWholeDay = DateOnly.FromDateTime(now.Date);
+                _eventsWholeAt = DateTime.UtcNow;
+            }
+        }
+        catch (CursorAuthException)
+        {
+            _eventsDeniedUntil = DateTime.UtcNow.AddMinutes(10);
+            return;
+        }
+
+        _extra.ApplyCharges(charges, coveredFrom);
     }
 
     private async Task RefreshAsync()

@@ -11,7 +11,7 @@
     <Product>CursorMeter</Product>
     <!-- This branch builds the Mainland edition: beta for Windows 10/11 with Start11 v1/v2 (experimental administrator mode). The stable Island edition lives on main. -->
     <Edition>Mainland</Edition>
-    <Version>1.4.1</Version>
+    <Version>1.5.0-beta.1</Version>
     <DefineConstants>$(DefineConstants);MAINLAND</DefineConstants>
     <Description>Duas barras na barra de tarefas: Cursor Models e Other Models.</Description>
   </PropertyGroup>

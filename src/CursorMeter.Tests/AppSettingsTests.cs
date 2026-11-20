@@ -35,6 +35,8 @@ public sealed class AppSettingsTests
             Pools = PoolView.CursorOnly,
             ShowRemaining = true,
             HideInFullscreen = false,
+            ExtraCeiling = 15,
+            ExtraKeepMinutes = 5,
         };
 
         Assert.Equal(settings, AppSettings.Parse(settings.Format()));
@@ -82,6 +84,13 @@ public sealed class AppSettingsTests
         Assert.Equal(0, AppSettings.Parse("BarSpacing=-5").BarSpacing);
         Assert.Equal(1, parsed.RefreshMinutes);
         Assert.Equal(10, parsed.FadedOpacity);
+        Assert.Equal(500, AppSettings.Parse("ExtraCeiling=900").ExtraCeiling);
+        Assert.Equal(0, AppSettings.Parse("ExtraCeiling=-4").ExtraCeiling);
+        Assert.Equal(15, AppSettings.Parse("ExtraCeiling=15").ExtraCeiling);
+        Assert.Equal(2, AppSettings.Default.ExtraKeepMinutes);
+        Assert.Equal(2, AppSettings.Parse("Theme=Dark").ExtraKeepMinutes);
+        Assert.Equal(1, AppSettings.Parse("ExtraKeepMinutes=0").ExtraKeepMinutes);
+        Assert.Equal(60, AppSettings.Parse("ExtraKeepMinutes=900").ExtraKeepMinutes);
     }
 
     [Fact]

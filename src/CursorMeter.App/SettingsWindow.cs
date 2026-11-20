@@ -224,6 +224,11 @@ internal sealed class SettingsWindow : Window
         var cards = new List<Control>
         {
             Card("Atualizar a utilização", "Com que frequência a app lê a quota ao Cursor. Também podes atualizar a partir do menu.", refresh),
+            // ExtraSpend: the ceiling that colours the minute graph. The graph replaces the summary, it is not inside it.
+            Card("Teto do consumo extra", "Em dólares. O gráfico do último minuto abre por cima das barras, em vez do resumo, e passa a aviso e a crítico à medida que o gasto extra de hoje se aproxima deste valor. Zero deixa o gráfico na cor normal.",
+                Number(0, 500, Settings.ExtraCeiling, value => Change(s => s with { ExtraCeiling = value }))),
+            Card("Tempo com o gráfico aberto", "Em minutos. Quando um consumo abre o gráfico sozinho, ele fica aberto este tempo depois do último consumo e fecha. Se abrires o gráfico no menu ou no resumo, fica aberto até o fechares.",
+                Number(1, 60, Settings.ExtraKeepMinutes, value => Change(s => s with { ExtraKeepMinutes = value }))), // ExtraSpend
         };
         if (_bars)
         {

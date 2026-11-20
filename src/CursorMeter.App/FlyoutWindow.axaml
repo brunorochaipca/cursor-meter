@@ -2,7 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="CursorMeter.App.FlyoutWindow"
         Title="CursorMeter"
-        Width="320"
+        Width="360"
         SizeToContent="Height"
         SystemDecorations="None"
         CanResize="False"
@@ -10,55 +10,117 @@
         Topmost="True"
         WindowStartupLocation="Manual"
         Background="Transparent"
+        FontFamily="Segoe UI Variable Text, Segoe UI"
         FontSize="12">
+  <!-- WinUI 3 look: the Fluent dark flyout surface, 8 px corners, 4 px controls, and the control fills
+       and text ramp of the Windows 11 dark theme. -->
+  <Window.Styles>
+    <Style Selector="Button.fluent">
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="MinHeight" Value="32" />
+      <Setter Property="Padding" Value="12,5,12,6" />
+      <Setter Property="Background" Value="#0FFFFFFF" />
+      <Setter Property="BorderBrush" Value="#18FFFFFF" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Foreground" Value="#FFFFFF" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.fluent:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#15FFFFFF" />
+      <Setter Property="BorderBrush" Value="#18FFFFFF" />
+      <Setter Property="Foreground" Value="#FFFFFF" />
+    </Style>
+    <Style Selector="Button.fluent:pressed /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#08FFFFFF" />
+      <Setter Property="BorderBrush" Value="#12FFFFFF" />
+      <Setter Property="Foreground" Value="#C5FFFFFF" />
+    </Style>
+    <!-- The refresh icon: no fill or border until the pointer is over it, like a WinUI subtle button. -->
+    <Style Selector="Button.fluent.icon">
+      <Setter Property="Width" Value="32" />
+      <Setter Property="Height" Value="32" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Foreground" Value="#C5FFFFFF" />
+    </Style>
+    <Style Selector="Button.fluent.icon:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#0FFFFFFF" />
+      <Setter Property="Foreground" Value="#FFFFFF" />
+    </Style>
+    <Style Selector="Button.fluent.icon:pressed /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#0AFFFFFF" />
+      <Setter Property="Foreground" Value="#8BFFFFFF" />
+    </Style>
+  </Window.Styles>
   <Border x:Name="Card"
-          Background="#181818"
-          BorderBrush="#33FFFFFF"
+          Background="#2C2C2C"
+          BorderBrush="#66757575"
           BorderThickness="1"
           CornerRadius="8"
-          Padding="16,14,16,14">
-    <StackPanel>
-      <TextBlock x:Name="DetailText"
-                 MinHeight="40"
-                 FontWeight="SemiBold"
-                 Foreground="#ECEAE2"
-                 TextWrapping="Wrap" />
-      <TextBlock x:Name="SecondaryText"
-                 MinHeight="18"
-                 Margin="0,0,0,16"
-                 Foreground="#B0ACA0"
-                 TextWrapping="Wrap" />
-      <StackPanel x:Name="SetupPanel" IsVisible="False" Spacing="10" Margin="0,0,0,16">
-        <StackPanel Spacing="3">
-          <Grid ColumnDefinitions="*,Auto">
-            <TextBlock Text="Cursor (recomendado)" FontWeight="SemiBold" Foreground="#ECEAE2" />
-            <TextBlock x:Name="CursorStatusText" Grid.Column="1" Foreground="#E07070" />
-          </Grid>
-          <TextBlock x:Name="CursorHintText" Foreground="#B0ACA0" TextWrapping="Wrap" />
-          <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,3,0,0">
-            <Button x:Name="OpenCursorButton" Content="Abrir o Cursor" />
-            <Button x:Name="DownloadCursorButton" Content="Transferir o Cursor" />
+          Padding="20,16,20,20">
+    <Grid>
+      <StackPanel>
+        <!-- The side margins keep the centred text clear of the refresh icon in the corner. -->
+        <TextBlock x:Name="DetailText"
+                   MinHeight="40"
+                   Margin="28,0"
+                   FontSize="14"
+                   FontWeight="SemiBold"
+                   Foreground="#FFFFFF"
+                   TextAlignment="Center"
+                   TextWrapping="Wrap" />
+        <TextBlock x:Name="SecondaryText"
+                   MinHeight="18"
+                   Margin="0,0,0,16"
+                   Foreground="#C5FFFFFF"
+                   TextAlignment="Center"
+                   TextWrapping="Wrap" />
+        <StackPanel x:Name="SetupPanel" IsVisible="False" Spacing="10" Margin="0,0,0,16">
+          <StackPanel Spacing="3">
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Text="Cursor (recomendado)" FontWeight="SemiBold" Foreground="#FFFFFF" />
+              <TextBlock x:Name="CursorStatusText" Grid.Column="1" Foreground="#E07070" />
+            </Grid>
+            <TextBlock x:Name="CursorHintText" Foreground="#C5FFFFFF" TextWrapping="Wrap" />
+            <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,3,0,0">
+              <Button x:Name="OpenCursorButton" Classes="fluent" Content="Abrir o Cursor" />
+              <Button x:Name="DownloadCursorButton" Classes="fluent" Content="Transferir o Cursor" />
+            </StackPanel>
           </StackPanel>
-        </StackPanel>
-        <Border Height="1" Background="#33FFFFFF" />
-        <StackPanel Spacing="3">
-          <Grid ColumnDefinitions="*,Auto">
-            <TextBlock Text="Firefox" FontWeight="SemiBold" Foreground="#ECEAE2" />
-            <TextBlock x:Name="FirefoxStatusText" Grid.Column="1" Foreground="#E07070" />
-          </Grid>
-          <TextBlock x:Name="FirefoxHintText" Foreground="#B0ACA0" TextWrapping="Wrap" />
-          <TextBlock x:Name="FirefoxWarningText" Foreground="#E0B050" TextWrapping="Wrap" IsVisible="False" />
-          <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
-            <Button x:Name="OpenFirefoxButton" Content="Abrir cursor.com no Firefox" />
+          <Border Height="1" Background="#19FFFFFF" />
+          <StackPanel Spacing="3">
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Text="Firefox" FontWeight="SemiBold" Foreground="#FFFFFF" />
+              <TextBlock x:Name="FirefoxStatusText" Grid.Column="1" Foreground="#E07070" />
+            </Grid>
+            <TextBlock x:Name="FirefoxHintText" Foreground="#C5FFFFFF" TextWrapping="Wrap" />
+            <TextBlock x:Name="FirefoxWarningText" Foreground="#E0B050" TextWrapping="Wrap" IsVisible="False" />
+            <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
+              <Button x:Name="OpenFirefoxButton" Classes="fluent" Content="Abrir cursor.com no Firefox" />
+            </StackPanel>
           </StackPanel>
+          <TextBlock Text="Outros navegadores, como o Edge e o Chrome, não são lidos."
+                     Foreground="#8BFFFFFF" FontSize="11" TextWrapping="Wrap" />
         </StackPanel>
-        <TextBlock Text="Outros navegadores, como o Edge e o Chrome, não são lidos."
-                   Foreground="#80ECEAE2" FontSize="11" TextWrapping="Wrap" />
+        <StackPanel x:Name="ActionsPanel" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+          <Button x:Name="DashboardButton" Classes="fluent" Content="Painel do Cursor" />
+          <!-- ExtraSpend -->
+          <Button x:Name="RealtimeButton" Classes="fluent" Content="Consumo em tempo real" />
+        </StackPanel>
+        <Button x:Name="CheckButton" Classes="fluent" Content="Verificar já" IsVisible="False" HorizontalAlignment="Center" MinWidth="120" />
       </StackPanel>
-      <StackPanel Orientation="Horizontal" Spacing="8">
-        <Button x:Name="RefreshButton" Content="Atualizar" MinWidth="96" />
-        <Button x:Name="DashboardButton" Content="Painel do Cursor" MinWidth="130" />
-      </StackPanel>
-    </StackPanel>
+      <Button x:Name="RefreshButton"
+              Classes="fluent icon"
+              HorizontalAlignment="Right"
+              VerticalAlignment="Top"
+              Margin="0,-8,-12,0"
+              ToolTip.Tip="Atualizar">
+        <!-- The refresh glyph, as a path so it does not depend on an icon font. -->
+        <PathIcon Width="14" Height="14"
+                  Data="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" />
+      </Button>
+    </Grid>
   </Border>
 </Window>

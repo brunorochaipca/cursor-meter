@@ -16,15 +16,22 @@ namespace CursorMeter.App;
 internal sealed partial class FlyoutWindow : Window
 {
     private const int Gap = 8;
+
+    /// <summary>Width of the summary card. The real-time graph uses the same, so the two take the same place.</summary>
+    internal const double CardWidth = 360;
+
     private PixelRect? _anchor;
     private bool _closing;
 
     public FlyoutWindow()
     {
         InitializeComponent();
+        Width = CardWidth;
         TransparencyLevelHint = [WindowTransparencyLevel.Mica];
         RefreshButton.Click += (_, _) => RefreshRequested?.Invoke(this, EventArgs.Empty);
+        CheckButton.Click += (_, _) => RefreshRequested?.Invoke(this, EventArgs.Empty);
         DashboardButton.Click += (_, _) => DashboardRequested?.Invoke(this, EventArgs.Empty);
+        RealtimeButton.Click += (_, _) => RealtimeRequested?.Invoke(this, EventArgs.Empty); // ExtraSpend
         OpenCursorButton.Click += (_, _) => OpenCursorRequested?.Invoke(this, EventArgs.Empty);
         DownloadCursorButton.Click += (_, _) => DownloadCursorRequested?.Invoke(this, EventArgs.Empty);
         OpenFirefoxButton.Click += (_, _) => OpenFirefoxRequested?.Invoke(this, EventArgs.Empty);
@@ -48,7 +55,7 @@ internal sealed partial class FlyoutWindow : Window
         AppLog.Info($"Flyout backdrop: {ActualTransparencyLevel}");
         Card.Background = ActualTransparencyLevel == WindowTransparencyLevel.Mica
             ? Brushes.Transparent
-            : new SolidColorBrush(Color.FromRgb(0x18, 0x18, 0x18));
+            : new SolidColorBrush(Color.FromRgb(0x2C, 0x2C, 0x2C));
     }
 
     private void RoundCorners()
@@ -60,6 +67,7 @@ internal sealed partial class FlyoutWindow : Window
     }
     public event EventHandler? RefreshRequested;
     public event EventHandler? DashboardRequested;
+    public event EventHandler? RealtimeRequested; // ExtraSpend
     public event EventHandler? OpenCursorRequested;
     public event EventHandler? DownloadCursorRequested;
     public event EventHandler? OpenFirefoxRequested;
@@ -73,8 +81,9 @@ internal sealed partial class FlyoutWindow : Window
         }
 
         SetupPanel.IsVisible = false;
-        DashboardButton.IsVisible = true;
-        RefreshButton.Content = "Atualizar";
+        ActionsPanel.IsVisible = true;
+        RefreshButton.IsVisible = true;
+        CheckButton.IsVisible = false;
         DetailText.Text = state.Detail;
         DetailText.MinHeight = 40;
         SecondaryText.IsVisible = true;
@@ -97,8 +106,9 @@ internal sealed partial class FlyoutWindow : Window
         SecondaryText.Margin = new Thickness(0, 2, 0, 12);
         SecondaryText.IsVisible = true;
         SetupPanel.IsVisible = true;
-        DashboardButton.IsVisible = false;
-        RefreshButton.Content = "Verificar já";
+        ActionsPanel.IsVisible = false;
+        RefreshButton.IsVisible = false;
+        CheckButton.IsVisible = true;
 
         CursorStatusText.Text = !setup.CursorInstalled ? "✗ não instalado"
             : setup.CursorHasSession ? "✗ sessão expirada"
