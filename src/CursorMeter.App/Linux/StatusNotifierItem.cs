@@ -71,6 +71,8 @@ internal sealed class StatusNotifierItem : IMethodHandler, IDisposable
     private IDisposable? _watcherSubscription;
     private volatile string _label = "";
     private volatile string _toolTip = "";
+    private volatile bool _labelHidden;
+    private MeterState? _lastState;
     private bool _disposed;
 
     private StatusNotifierItem(Connection connection, IReadOnlyList<MenuEntry?> menu, Action activate)
@@ -112,9 +114,23 @@ internal sealed class StatusNotifierItem : IMethodHandler, IDisposable
 
     public string Path => ItemPath;
 
+    /// <summary>
+    /// Drops the text next to the icon while the GNOME Shell extension draws the bars, so the
+    /// percentages are not shown twice. The icon and its menu stay.
+    /// </summary>
+    public void SetLabelHidden(bool hidden)
+    {
+        if (_labelHidden == hidden)
+            return;
+        _labelHidden = hidden;
+        if (_lastState is { } state)
+            Show(state);
+    }
+
     public void Show(MeterState state)
     {
-        var label = state.Quotas is { } quotas ? QuotaText.PanelLabel(quotas) : state.Status ?? state.Detail;
+        _lastState = state;
+        var label = _labelHidden ? "" : state.Quotas is { } quotas ? QuotaText.PanelLabel(quotas) : state.Status ?? state.Detail;
         if (label != _label)
         {
             _label = label;

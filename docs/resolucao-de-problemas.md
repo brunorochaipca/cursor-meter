@@ -25,9 +25,9 @@ Em `%LOCALAPPDATA%\CursorMeter`:
 
 O instalador não está assinado. Escolhe **Mais informações** e depois **Executar mesmo assim**.
 
-## Ubuntu: não vejo o ícone
+## Zorin: não vejo as barras
 
-O ícone precisa de um painel com suporte para AppIndicator (StatusNotifierItem). Ver [Ubuntu](ubuntu.md).
+Termina a sessão e entra outra vez depois de instalar, para o GNOME carregar a extensão. Ver [Zorin OS](zorin.md).
 
 ## Com o Start11 v1 ou v2 a barra de tarefas fica por cima das barras
 

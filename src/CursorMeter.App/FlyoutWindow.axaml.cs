@@ -134,9 +134,11 @@ internal sealed partial class FlyoutWindow : Window
         OpenFirefoxButton.IsVisible = setup.FirefoxPath is not null;
     }
 
-    public void ShowNear(PixelRect? anchor)
+    /// <param name="centered">Opens the card centred on the anchor instead of lined up with its left edge.</param>
+    public void ShowNear(PixelRect? anchor, bool centered = false)
     {
         _anchor = anchor;
+        _centered = centered;
         Show();
         Activate();
     }
@@ -182,7 +184,9 @@ internal sealed partial class FlyoutWindow : Window
         var area = screen.WorkingArea;
         bool panelOnTop = area.Y > screen.Bounds.Y;
 
-        int x = _anchor?.X ?? area.Right - size.Width - (gap * 2);
+        int x = _anchor is { } placed
+            ? (_centered ? placed.X + (placed.Width / 2) - (size.Width / 2) : placed.X)
+            : area.Right - size.Width - (gap * 2);
         int top = _anchor?.Y ?? (panelOnTop ? area.Y : area.Bottom);
         int bottom = _anchor?.Bottom ?? top;
 
@@ -250,6 +254,7 @@ internal sealed partial class FlyoutWindow : Window
     }
 
     private string? _lastPlacement;
+    private bool _centered;
     private PixelSize? _placedSize;
     private bool _settling;
 

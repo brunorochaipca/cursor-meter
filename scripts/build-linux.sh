@@ -30,6 +30,9 @@ mkdir -p "$staging/$name"
 install -m 755 "$publish/CursorMeter" "$staging/$name/CursorMeter"
 install -m 755 "$root/scripts/linux/install.sh" "$root/scripts/linux/uninstall.sh" "$staging/$name/"
 install -m 644 "$root/scripts/linux/cursormeter.desktop" "$root/scripts/linux/cursormeter.svg" "$staging/$name/"
+cp -r "$root/scripts/linux/gnome-shell" "$staging/$name/gnome-shell"
+find "$staging/$name/gnome-shell" -type d -exec chmod 755 {} +
+find "$staging/$name/gnome-shell" -type f -exec chmod 644 {} +
 
 mkdir -p "$root/dist"
 archive="$root/dist/$name.tar.gz"

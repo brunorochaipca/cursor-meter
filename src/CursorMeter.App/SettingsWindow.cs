@@ -59,6 +59,7 @@ internal sealed class SettingsWindow : Window
         }
         else
         {
+            _pages.Add(("Aspeto", false, PanelAppearancePage));
             _pages.Add(("Utilização", false, UsagePage));
         }
 
@@ -180,6 +181,19 @@ internal sealed class SettingsWindow : Window
             Card("Tamanho do texto", "Em relação ao tamanho normal.", scale),
             Card("Mostrar", "As duas pools, ou só uma.", pools),
             Card("Mostrar o que resta", "A percentagem e a barra passam a mostrar o que ainda tens disponível, em vez do que usaste.", remaining));
+    }
+
+    /// <summary>Where there are no bars of ours to preview: how the GNOME Shell extension draws them in the taskbar.</summary>
+    private Control PanelAppearancePage()
+    {
+        var scale = Slide(80, 110, Settings.TextScale, "{0}%", value => Change(s => s with { TextScale = value }));
+        var spacing = Slide(0, 16, Settings.BarSpacing, "{0} px", value => Change(s => s with { BarSpacing = value }));
+
+        return Page(
+            Note("Vale para as barras que a extensão do GNOME Shell desenha na barra de tarefas do Zorin."),
+            Card("Tamanho do texto", "Em relação ao tamanho normal. As barras seguem a altura da barra de tarefas.", scale),
+            Card("Espaço entre as barras", "Em pixels. Se a barra de tarefas for baixa, o espaço encolhe para as duas barras caberem.", spacing),
+            ColorCard("Cor do texto", "Os nomes das pools e as percentagens. Vazio é a cor original.", s => s.TextColor, (s, c) => s with { TextColor = c }, Palette.Text));
     }
 
     private Control ColorsPage()

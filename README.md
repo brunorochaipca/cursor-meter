@@ -32,9 +32,10 @@ Como funciona por dentro: [modo administrador experimental](docs/mainland.md).
 
 ## Tudo o resto
 
-As definições, as ilhas, as barras flutuantes, a privacidade e o Ubuntu são iguais aos da Island. Ver o [README da Island](https://github.com/brunorochaipca/cursor-meter/blob/main/README.md) e a pasta [docs](docs):
+As definições, as ilhas, as barras flutuantes, e a privacidade são iguais aos da Island. Ver o [README da Island](https://github.com/brunorochaipca/cursor-meter/blob/main/README.md) e a pasta [docs](docs):
 
 - [Windows e Start11](docs/windows.md)
+- [Zorin OS](docs/zorin.md)
 - [As duas edições](docs/edicoes.md)
 - [Resolução de problemas](docs/resolucao-de-problemas.md)
 - [Compilar a partir do código](docs/compilar.md)

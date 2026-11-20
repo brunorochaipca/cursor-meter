@@ -15,7 +15,7 @@ Cada edição vive na sua branch, e cada branch compila só a sua edição:
 | Island | `main` | `publish\CursorMeter.exe` | `dist\CursorMeter-Setup-<versão>.exe` |
 | Mainland | `mainland` | `publish-mainland\CursorMeter.exe` | `dist\CursorMeter-Mainland-Setup-<versão>.exe` |
 
-## Ubuntu
+## Zorin OS
 
 Com o .NET 8 SDK:
 

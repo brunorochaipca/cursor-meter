@@ -24,6 +24,7 @@ public sealed class AppSettingsTests
             TextColor = "#FFEEDD",
             HotColor = "#FF0000",
             TextScale = 90,
+            BarSpacing = 9,
             Outline = false,
             Radius = 8,
             RefreshMinutes = 10,
@@ -62,11 +63,13 @@ public sealed class AppSettingsTests
     [Fact]
     public void Numbers_are_brought_into_range()
     {
-        var parsed = AppSettings.Parse("BackgroundOpacity=400\nTextScale=10\nRadius=99\nRefreshMinutes=0\nFadedOpacity=0");
+        var parsed = AppSettings.Parse("BackgroundOpacity=400\nTextScale=10\nRadius=99\nBarSpacing=99\nRefreshMinutes=0\nFadedOpacity=0");
 
         Assert.Equal(100, parsed.BackgroundOpacity);
         Assert.Equal(80, parsed.TextScale);
         Assert.Equal(16, parsed.Radius);
+        Assert.Equal(16, parsed.BarSpacing);
+        Assert.Equal(0, AppSettings.Parse("BarSpacing=-5").BarSpacing);
         Assert.Equal(1, parsed.RefreshMinutes);
         Assert.Equal(10, parsed.FadedOpacity);
     }

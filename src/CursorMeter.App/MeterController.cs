@@ -25,6 +25,7 @@ internal sealed class MeterController : IDisposable
     private readonly DispatcherTimer _usageTimer;
     private readonly TrayIcon? _tray;
     private readonly StatusNotifierItem? _statusItem;
+    private readonly PanelFeedWriter? _panelFeed;
     private readonly TaskbarHost? _taskbar;
     private MeterState _state = MeterState.Loading;
     private FlyoutWindow? _flyout;
@@ -42,7 +43,12 @@ internal sealed class MeterController : IDisposable
         if (OperatingSystem.IsLinux())
         {
             _statusItem = StatusNotifierItem.TryCreate(menu, ToggleFlyout);
+            _panelFeed = PanelFeedWriter.TryCreate();
+            if (_panelFeed is not null)
+                _panelFeed.ExtensionChanged += (_, _) => Dispatcher.UIThread.Post(ApplyPanelExtension);
+            ApplyPanelExtension();
             _statusItem?.Show(_state);
+            WritePanelFeed();
         }
 
         // Windows has its own native notification area icon and menu, owned by the taskbar host.
@@ -84,6 +90,7 @@ internal sealed class MeterController : IDisposable
         _settings?.Close();
         _taskbar?.Dispose();
         _tray?.Dispose();
+        _panelFeed?.Dispose();
         _statusItem?.Dispose();
         _client.Dispose();
     }
@@ -154,6 +161,26 @@ internal sealed class MeterController : IDisposable
         var interval = TimeSpan.FromMinutes(SettingsStore.Current.RefreshMinutes);
         if (_usageTimer.Interval != interval)
             _usageTimer.Interval = interval;
+        WritePanelFeed();
+    }
+
+    /// <summary>The GNOME Shell extension draws the bars while it is enabled, so the tray text is dropped.</summary>
+    private void ApplyPanelExtension()
+    {
+        if (_disposed)
+            return;
+        _statusItem?.SetLabelHidden(_panelFeed?.ExtensionActive == true);
+    }
+
+    private void WritePanelFeed()
+    {
+        _panelFeed?.Write(PanelFeed.Build(
+            _state.Status,
+            _state.Detail,
+            _state.Quotas,
+            SettingsStore.Current,
+            Environment.ProcessId,
+            DateTimeOffset.UtcNow));
     }
 
     private void ShowSettings()
@@ -219,7 +246,11 @@ internal sealed class MeterController : IDisposable
         };
         flyout.ShowState(_state);
         _flyout = flyout;
-        flyout.ShowNear(_taskbar?.Anchor);
+
+        // On Windows the bars are the anchor and the card lines up with them. On Linux the anchor is the
+        // extension's bars in the taskbar, and the card opens centred above them.
+        var panelAnchor = _taskbar is null && _panelFeed?.ExtensionActive == true ? _panelFeed.ReadAnchor() : null;
+        flyout.ShowNear(_taskbar?.Anchor ?? panelAnchor, centered: panelAnchor is not null);
     }
 
     private async Task RefreshAsync()
@@ -329,6 +360,7 @@ internal sealed class MeterController : IDisposable
         _taskbar?.Show(state);
         _flyout?.ShowState(state);
         _statusItem?.Show(state);
+        WritePanelFeed();
         _taskbar?.SetTooltip(state.Detail);
         if (_tray is not null)
             _tray.ToolTipText = state.Detail;

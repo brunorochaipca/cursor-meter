@@ -30,6 +30,9 @@ exe="$app_dir/CursorMeter"
 desktop="$data/applications/cursormeter.desktop"
 icon="$data/icons/hicolor/scalable/apps/cursormeter.svg"
 autostart_entry="$config/autostart/cursormeter.desktop"
+ext_uuid="cursormeter@cursor-meter"
+ext_src="$here/gnome-shell/$ext_uuid"
+ext_dir="$data/gnome-shell/extensions/$ext_uuid"
 
 # Desktop Entry spec: quote the argument, escape " ` $ \ for the quoting and every backslash again for the string value.
 exec_value() {
@@ -72,6 +75,33 @@ install -m 755 "$here/uninstall.sh" "$app_dir/uninstall.sh"
 install -D -m 644 "$here/cursormeter.svg" "$icon"
 write_entry "$desktop"
 
+# The extension draws the bars inside the Zorin taskbar. GNOME Shell on Wayland only finds new
+# extensions when the session starts, so it is registered here and appears after the next login.
+#
+# Zorin keeps its own extensions in a default that only a Zorin session sees. Writing a list of our
+# own over an empty reading would switch the taskbar and the menu off, so the list is only extended
+# when it already has entries; otherwise the user enables the extension after logging in again.
+extension_installed=false
+extension_registered=false
+if [[ -d "$ext_src" ]]; then
+  rm -rf "$ext_dir"
+  mkdir -p "$ext_dir"
+  cp -r "$ext_src/." "$ext_dir/"
+  chmod -R u+rwX,go+rX "$ext_dir"
+  extension_installed=true
+
+  if command -v gsettings >/dev/null 2>&1; then
+    enabled="$(gsettings get org.gnome.shell enabled-extensions 2>/dev/null || true)"
+    if [[ "$enabled" == *"'$ext_uuid'"* ]]; then
+      extension_registered=true
+    elif [[ "$enabled" == \[\'*\'\] ]]; then
+      if gsettings set org.gnome.shell enabled-extensions "${enabled%]}, '$ext_uuid']" 2>/dev/null; then
+        extension_registered=true
+      fi
+    fi
+  fi
+fi
+
 if $autostart; then
   write_entry "$autostart_entry" $'X-GNOME-Autostart-enabled=true\n'
 fi
@@ -86,6 +116,14 @@ fi
 echo "CursorMeter instalado em $exe"
 if $autostart; then
   echo "Inicia com a sessão: $autostart_entry"
+fi
+if $extension_installed; then
+  echo "Extensão das barras: $ext_dir"
+  if $extension_registered; then
+    echo "Termina a sessão e entra outra vez para ver as barras na barra de tarefas."
+  else
+    echo "Termina a sessão, entra outra vez e corre: gnome-extensions enable $ext_uuid"
+  fi
 fi
 echo "Para desinstalar: $app_dir/uninstall.sh"
 

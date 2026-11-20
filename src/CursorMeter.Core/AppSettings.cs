@@ -55,6 +55,11 @@ public sealed record AppSettings
 
     public bool Outline { get; init; } = true;
 
+    public const int DefaultBarSpacing = 4;
+
+    /// <summary>Space between the two bars, in pixels. Only the bars the GNOME Shell extension draws use it.</summary>
+    public int BarSpacing { get; init; } = DefaultBarSpacing;
+
     /// <summary>Corner radius in device-independent pixels; -1 follows the theme.</summary>
     public int Radius { get; init; } = -1;
 
@@ -86,6 +91,7 @@ public sealed record AppSettings
             BackgroundOpacity = Math.Clamp(BackgroundOpacity, 0, 100),
             TextScale = Math.Clamp(TextScale, 80, 110),
             Radius = Math.Clamp(Radius, -1, 16),
+            BarSpacing = Math.Clamp(BarSpacing, 0, 16),
             RefreshMinutes = Math.Clamp(RefreshMinutes, 1, 60),
             WarnAt = warn,
             HotAt = Math.Clamp(HotAt, warn + 1, 100),
@@ -133,6 +139,7 @@ public sealed record AppSettings
             BackgroundOpacity = Number(values, nameof(BackgroundOpacity), defaults.BackgroundOpacity),
             TextScale = Number(values, nameof(TextScale), defaults.TextScale),
             Radius = Number(values, nameof(Radius), defaults.Radius),
+            BarSpacing = Number(values, nameof(BarSpacing), defaults.BarSpacing),
             RefreshMinutes = Number(values, nameof(RefreshMinutes), defaults.RefreshMinutes),
             WarnAt = Number(values, nameof(WarnAt), defaults.WarnAt),
             HotAt = Number(values, nameof(HotAt), defaults.HotAt),
@@ -165,6 +172,7 @@ public sealed record AppSettings
         Line(nameof(Outline), s.Outline ? 1 : 0);
         Line(nameof(Radius), s.Radius);
         Line(nameof(TextScale), s.TextScale);
+        Line(nameof(BarSpacing), s.BarSpacing);
         Line(nameof(Pools), s.Pools);
         Line(nameof(ShowRemaining), s.ShowRemaining ? 1 : 0);
         Line(nameof(HideInFullscreen), s.HideInFullscreen ? 1 : 0);

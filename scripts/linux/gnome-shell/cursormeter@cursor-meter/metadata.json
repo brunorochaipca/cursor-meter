@@ -1,0 +1,7 @@
+{
+  "uuid": "cursormeter@cursor-meter",
+  "name": "CursorMeter",
+  "description": "Mostra as quotas do Cursor como duas barras dentro da barra de tarefas do Zorin OS. Precisa do programa CursorMeter a correr: é ele que lê as quotas.",
+  "shell-version": ["46", "47", "48", "49"],
+  "version": 1
+}
