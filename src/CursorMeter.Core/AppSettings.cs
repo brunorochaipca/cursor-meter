@@ -70,6 +70,9 @@ public sealed record AppSettings
     /// <summary>Opacity of the floating bars until the pointer is over them, in percent.</summary>
     public int FadedOpacity { get; init; } = 40;
 
+    /// <summary>The bars glide, instead of jumping, between the taskbar and the floating place.</summary>
+    public bool GlideBars { get; init; } = true;
+
     public PoolView Pools { get; init; } = PoolView.Both;
 
     /// <summary>Hides the bars while a full-screen application has the screen, as the taskbar does.</summary>
@@ -145,6 +148,7 @@ public sealed record AppSettings
             HotAt = Number(values, nameof(HotAt), defaults.HotAt),
             FadedOpacity = Number(values, nameof(FadedOpacity), defaults.FadedOpacity),
             Outline = Flag(values, nameof(Outline), defaults.Outline),
+            GlideBars = Flag(values, nameof(GlideBars), defaults.GlideBars),
             ShowRemaining = Flag(values, nameof(ShowRemaining), defaults.ShowRemaining),
             HideInFullscreen = Flag(values, nameof(HideInFullscreen), defaults.HideInFullscreen),
             TextColor = Text(values, nameof(TextColor)),
@@ -180,6 +184,7 @@ public sealed record AppSettings
         Line(nameof(WarnAt), s.WarnAt);
         Line(nameof(HotAt), s.HotAt);
         Line(nameof(FadedOpacity), s.FadedOpacity);
+        Line(nameof(GlideBars), s.GlideBars ? 1 : 0);
         Line(nameof(TextColor), s.TextColor);
         Line(nameof(MutedColor), s.MutedColor);
         Line(nameof(CursorColor), s.CursorColor);

@@ -47,6 +47,21 @@
     Termina o CursorMeter com o menu aberto para ver se o recorte fica na barra, volta a abri-lo e
     limpa o recorte no fim. Pede confirmacao, a menos que se use -Sim.
 
+.PARAMETER AutoOcultacao
+    Acrescenta o caso da auto-ocultacao da barra de tarefas (Windows ou Start11, tambem no v1/v2). Maximiza uma
+    janela do proprio script, espera que a barra de tarefas se esconda e confere:
+      - o modo das barras: flutuantes (definicao "Barras flutuantes" ligada) ou escondidas (desligada), lido de
+        %LOCALAPPDATA%\CursorMeter\floating.txt e do registo da app;
+      - as flutuantes ficam visiveis e fora da barra de tarefas, as escondidas desaparecem;
+      - nao ha piscar: a app nao troca de modo varias vezes por segundo (o ciclo em que o Start11 mostra e esconde
+        a barra porque as barras se mexem), e se a app o detetou e ficou a flutuar fica um aviso;
+      - ao fechar a janela as barras voltam ao modo, a posicao e aos pixeis de antes.
+    Precisa da auto-ocultacao ligada (no Start11: "Ativar o modo de auto-ocultacao do Start11"). Sem ela o caso
+    fica INCONCLUSIVO. Nao uses o teclado nem o rato.
+
+.PARAMETER SoAutoOcultacao
+    Como -AutoOcultacao, mas sem o caso do menu Iniciar.
+
 .PARAMETER AbrirJanelas
     Abre N janelas do Bloco de Notas antes do teste e fecha-as no fim. Com o Start11 (e a barra sem agrupar
     janelas) enchem a ilha dos icones e tiram o espaco da ilha das barras: reproduz o modo flutuante.
@@ -65,6 +80,9 @@
 
 .EXAMPLE
     powershell -ExecutionPolicy Bypass -File scripts\test-start-menu.ps1 -VistaDeTarefas -TesteCrash -Etiqueta 125pct
+
+.EXAMPLE
+    powershell -ExecutionPolicy Bypass -File scripts\test-start-menu.ps1 -SoAutoOcultacao -Etiqueta start11-v2
 #>
 [CmdletBinding()]
 param(
@@ -73,6 +91,8 @@ param(
     [int]$Segundos = 25,
     [switch]$VistaDeTarefas,
     [switch]$TesteCrash,
+    [switch]$AutoOcultacao,
+    [switch]$SoAutoOcultacao,
     [int]$AbrirJanelas = 0,
     [switch]$Sim,
     [string]$Etiqueta = '',
@@ -650,7 +670,7 @@ function Get-OverlapWarning($x, [string]$mode) {
 function Get-PlacementLine {
     if (-not (Test-Path -LiteralPath $LogPath)) { return '' }
     try {
-        $line = Get-Content -LiteralPath $LogPath -Tail 300 | Where-Object { $_ -match 'Placement:' } | Select-Object -Last 1
+        $line = Get-Content -LiteralPath $LogPath -Tail 600 | Where-Object { Test-ModeLine $_ } | Select-Object -Last 1
     } catch {
         return ''
     }
@@ -658,15 +678,27 @@ function Get-PlacementLine {
     return ''
 }
 
+# A "Placement:" line that says where the bars are. The app also logs what it measured on the taskbar
+# (taskbar probe, keep clear) and when it stops docking the bars (auto-hide loop), and those are not modes.
+function Test-ModeLine([string]$line) {
+    if ($line -notmatch 'Placement:') { return $false }
+    return ($line -notmatch 'taskbar probe|keep clear|the taskbar hides and shows|the bars may dock again')
+}
+
 # Names the placement mode from the app log. "ilha" is Start11, "corte" is the 1.2.6 cut, "ao-lado" is 1.2.5 or the fallback.
 function Get-ModeName([string]$line) {
     if ([string]::IsNullOrEmpty($line)) { return 'sem-log' }
+    # Auto-hidden taskbar: the bars float (floating bars on) or are held hidden (off). Checked first, as the
+    # hidden line also says "bars hidden".
+    if ($line -match 'taskbar auto-hidden') { if ($line -match 'bars hidden') { return 'auto-escondido' } return 'auto-flutuante' }
     if ($line -match 'Placement: island') { return 'ilha' }
     if ($line -match 'Placement: floating') { return 'flutuante' }
+    if ($line -match 'overlay above the raised taskbar \(UIAccess\)') { return 'uiaccess' }
     if ($line -match 'overlay through the taskbar') { return 'corte' }
     if ($line -match 'overlay beside the taskbar') { return 'ao-lado' }
     if ($line -match 'overlay on the taskbar') { return 'normal' }
     if ($line -match 'embedded in the taskbar') { return 'embutido' }
+    if ($line -match 'bars hidden') { return 'escondido' }
     return 'outro'
 }
 
@@ -747,8 +779,9 @@ function Get-MeterInfo {
     $version = ''
     $path = ''
     try {
+        # A process that runs as administrator (the UIAccess mode) hides its path from a script without elevation.
         $path = $process.Path
-        $version = (Get-Item -LiteralPath $path).VersionInfo.ProductVersion
+        if ($path) { $version = (Get-Item -LiteralPath $path).VersionInfo.ProductVersion }
     } catch {
     }
     return [pscustomobject]@{ Running = $true; Path = $path; Version = $version; Name = $process.ProcessName }
@@ -903,6 +936,10 @@ function Invoke-Case([string]$name, [string]$kind) {
             if (-not $moved) { Add-Result $name 'flutuante' 'PASSA' 'modo flutuante, barras no mesmo sitio e sem recorte' }
             else { Add-Result $name 'flutuante' 'FALHA' ('modo flutuante mas as barras mexeram-se: {0} -> {1}' -f (Get-WidgetText $base), (Get-WidgetText $last.Reading)) }
         }
+        elseif ($openMode -eq 'uiaccess') {
+            if (-not $moved) { Add-Result $name 'uiaccess' 'PASSA' 'modo administrador (UIAccess): as barras ficam acima da barra levantada, no mesmo sitio e sem recorte' }
+            else { Add-Result $name 'uiaccess' 'FALHA' ('modo UIAccess mas as barras mexeram-se: {0} -> {1}' -f (Get-WidgetText $base), (Get-WidgetText $last.Reading)) }
+        }
         elseif ($openMode -eq 'ao-lado') {
             if ($expectCut) {
                 Add-Result $name 'recorte' 'FALHA' ('as barras sairam da barra ({0} -> {1}) em vez de ficarem recortadas. E o comportamento da 1.2.5, ou o recorte foi recusado.' -f (Get-WidgetText $base), (Get-WidgetText $last.Reading))
@@ -913,6 +950,10 @@ function Invoke-Case([string]$name, [string]$kind) {
             else {
                 Add-Result $name 'recurso' 'FALHA' 'o log diz ao-lado mas a janela continua sobre a barra'
             }
+        }
+        elseif ($openMode -eq 'escondido') {
+            # The cut was tried and something else (Start11) kept clearing the region, so the app gave up.
+            Add-Result $name 'recurso' 'AVISO' 'modo escondido: o recorte nao aguenta (o Start11 repoe a regiao da barra), as barras escondem-se enquanto o menu esta aberto e voltam ao fechar.'
         }
         elseif ($openMode -eq 'normal') {
             Add-Result $name 'modo' 'FALHA' 'a barra mudou de camada mas a app continua em modo normal: nao reagiu ao menu'
@@ -1049,6 +1090,169 @@ function Invoke-CrashTest {
     }
 }
 
+# ---------------------------------------------------------------- auto-hidden taskbar
+
+# True when the user turned the floating bars off. floating.txt is "left top hidden", hidden being 1 or 0.
+function Get-FloatingOff {
+    $path = Join-Path $env:LOCALAPPDATA 'CursorMeter\floating.txt'
+    if (-not (Test-Path -LiteralPath $path)) { return $false }
+    try {
+        $parts = @((Get-Content -LiteralPath $path -Raw) -split '[\s,;]+' | Where-Object { $_ })
+    } catch {
+        return $false
+    }
+    return ($parts.Count -ge 3 -and $parts[2] -eq '1')
+}
+
+# Waits while keeping the window of this script alive, so it is not marked as not responding.
+function Wait-Pumping([scriptblock]$condition, [int]$milliseconds = 3000) {
+    $watch = [System.Diagnostics.Stopwatch]::StartNew()
+    while ($watch.ElapsedMilliseconds -lt $milliseconds) {
+        [System.Windows.Forms.Application]::DoEvents()
+        if ($null -ne $condition -and (& $condition)) { return $true }
+        Start-Sleep -Milliseconds 50
+    }
+    return $false
+}
+
+# The "Placement:" lines of the app since a moment, with the app's own measurements left out.
+function Get-ModeLinesSince([datetime]$since) {
+    if (-not (Test-Path -LiteralPath $LogPath)) { return @() }
+    $found = @()
+    try {
+        foreach ($line in (Get-Content -LiteralPath $LogPath -Tail 3000)) {
+            if ($line.Length -lt 23) { continue }
+            $stamp = [datetime]::MinValue
+            if (-not [datetime]::TryParseExact($line.Substring(0, 23), 'yyyy-MM-dd HH:mm:ss.fff', [System.Globalization.CultureInfo]::InvariantCulture, [System.Globalization.DateTimeStyles]::None, [ref]$stamp)) { continue }
+            if ($stamp -lt $since) { continue }
+            if (Test-ModeLine $line) { $found += $line }
+        }
+    } catch {
+    }
+    return $found
+}
+
+function Get-LogLinesSince([datetime]$since, [string]$pattern) {
+    if (-not (Test-Path -LiteralPath $LogPath)) { return @() }
+    $found = @()
+    try {
+        foreach ($line in (Get-Content -LiteralPath $LogPath -Tail 3000)) {
+            if ($line.Length -lt 23 -or $line -notmatch $pattern) { continue }
+            $stamp = [datetime]::MinValue
+            if (-not [datetime]::TryParseExact($line.Substring(0, 23), 'yyyy-MM-dd HH:mm:ss.fff', [System.Globalization.CultureInfo]::InvariantCulture, [System.Globalization.DateTimeStyles]::None, [ref]$stamp)) { continue }
+            if ($stamp -ge $since) { $found += $line }
+        }
+    } catch {
+    }
+    return $found
+}
+
+# Maximises a window of this script, which makes the taskbar hide itself, and checks what the bars do.
+function Invoke-AutoHideCase {
+    $name = 'auto-ocultacao'
+    Write-Host ''
+    Write-Host 'Caso: auto-ocultacao da barra de tarefas (janela maximizada)' -ForegroundColor Cyan
+
+    $base = Get-Reading
+    if (-not $base.TaskbarFound) { Add-Result $name 'arranque' 'FALHA' 'nao ha Shell_TrayWnd'; return }
+    if (-not $base.WidgetFound) { Add-Result $name 'arranque' 'FALHA' 'o CursorMeter nao esta a correr ou nao tem janela de barras'; return }
+    $baseMode = Get-ModeName (Get-PlacementLine)
+    if ($baseMode -eq 'embutido') { Add-Result $name 'arranque' 'INCONCLUSIVO' 'as barras estao embutidas na barra (Windows 10). Este caso e para o Windows 11.'; return }
+    if ($baseMode -like 'auto-*') { Add-Result $name 'arranque' 'INCONCLUSIVO' 'a barra de tarefas ja estava auto-ocultada. Mostra-a (rato no fundo do ecra), fecha as janelas maximizadas e repete.'; return }
+
+    $floatingOff = Get-FloatingOff
+    $expected = if ($floatingOff) { 'auto-escondido' } else { 'auto-flutuante' }
+    $expectText = if ($floatingOff) { 'barras flutuantes desligadas: as barras devem esconder-se' } else { 'barras flutuantes ligadas: as barras devem flutuar' }
+    Add-Result $name 'antes' 'INFO' ('barras {0}, modo {1}, barra {2}; {3}' -f (Get-WidgetText $base), $baseMode, (Get-RectText $base.TaskbarL $base.TaskbarT $base.TaskbarR $base.TaskbarB), $expectText)
+    $baseBitmap = Save-Capture $base (Join-Path $Saida ('{0}-1-antes.png' -f $name))
+
+    $since = Get-Date
+    $form = $null
+    try {
+        $form = New-Object System.Windows.Forms.Form
+        $form.Text = 'CursorMeter - teste da auto-ocultacao'
+        $form.StartPosition = 'CenterScreen'
+        $form.WindowState = [System.Windows.Forms.FormWindowState]::Maximized
+        $form.Show()
+        $form.Activate()
+
+        $hid = Wait-Pumping { (Get-ModeName (Get-PlacementLine)) -like 'auto-*' } 7000
+        if (-not $hid) {
+            $probe = (Get-LogLinesSince $since 'taskbar probe') | Select-Object -Last 1
+            Add-Result $name 'esconder' 'INCONCLUSIVO' ('a barra de tarefas nao se auto-ocultou com uma janela maximizada em 7 s. Liga a auto-ocultacao (no Start11: "Ativar o modo de auto-ocultacao do Start11"), ou esta app e anterior a esta funcionalidade. Ultima sonda: {0}' -f $(if ($probe) { $probe } else { 'nenhuma' }))
+            Save-Screen (Join-Path $Saida ('{0}-2-sem-esconder-ecra.png' -f $name))
+            return
+        }
+
+        $samples = @()
+        foreach ($wait in @(0, 800, 1600)) {
+            if ($wait -gt 0) { $null = Wait-Pumping $null 800 }
+            $s = Get-Reading
+            $mode = Get-ModeName (Get-PlacementLine)
+            $samples += [pscustomobject]@{ Reading = $s; Mode = $mode }
+            Save-Screen (Join-Path $Saida ('{0}-2-escondida-{1}ms-ecra.png' -f $name, $wait))
+            Write-Host ('    +{0,4} ms  modo={1}  barras={2}  barra={3}' -f $wait, $mode, $(if ($s.WidgetFound) { Get-WidgetText $s } else { 'sem janela' }), (Get-RectText $s.TaskbarL $s.TaskbarT $s.TaskbarR $s.TaskbarB))
+        }
+
+        # 1. The mode the floating bars setting asks for, held for the whole time.
+        $modes = @($samples | ForEach-Object { $_.Mode } | Select-Object -Unique)
+        if ($modes.Count -eq 1 -and $modes[0] -eq $expected) { Add-Result $name 'modo' 'PASSA' ('modo {0}, igual nas tres medidas' -f $expected) }
+        else { Add-Result $name 'modo' 'FALHA' ('esperado {0}, o registo da app deu: {1}' -f $expected, ($modes -join ', ')) }
+
+        # 2. Where the bars are.
+        $last = $samples[-1].Reading
+        if ($floatingOff) {
+            $stillShown = @($samples | Where-Object { $_.Reading.WidgetFound }).Count
+            if ($stillShown -eq 0) { Add-Result $name 'barras' 'PASSA' 'as barras escondem-se com a barra de tarefas' }
+            else { Add-Result $name 'barras' 'FALHA' ('as barras continuam visiveis ({0}) com a barra de tarefas escondida e as barras flutuantes desligadas' -f (Get-WidgetText $last)) }
+        }
+        else {
+            $missing = @($samples | Where-Object { -not $_.Reading.WidgetFound }).Count
+            if ($missing -gt 0) { Add-Result $name 'barras' 'FALHA' 'as barras desapareceram em vez de flutuarem' }
+            elseif (Test-OverlapsTaskbar $last) { Add-Result $name 'barras' 'AVISO' ('as barras flutuam sobre a barra de tarefas ({0}): foram arrastadas para la, ou ha um erro' -f (Get-WidgetText $last)) }
+            else { Add-Result $name 'barras' 'PASSA' ('barras a flutuar fora da barra de tarefas ({0})' -f (Get-WidgetText $last)) }
+            if (-not (Test-SameWidget $samples[0].Reading $last)) { Add-Result $name 'estavel' 'FALHA' ('as barras flutuantes mexeram-se sozinhas: {0} -> {1}' -f (Get-WidgetText $samples[0].Reading), (Get-WidgetText $last)) }
+        }
+
+        # 3. No flicker: the app changing mode over and over is Start11 and the bars reacting to each other.
+        $changes = @(Get-ModeLinesSince $since)
+        $loop = @(Get-LogLinesSince $since 'the taskbar hides and shows')
+        $text = ('{0} mudancas de modo no registo desde que a janela abriu' -f $changes.Count)
+        if ($loop.Count -gt 0) { Add-Result $name 'piscar' 'AVISO' ('{0}; a app detetou o ciclo do Start11 e deixou as barras a flutuar ate as mexeres' -f $text) }
+        elseif ($changes.Count -le 4) { Add-Result $name 'piscar' 'PASSA' $text }
+        else { Add-Result $name 'piscar' 'FALHA' ('{0}: a barra de tarefas esta a esconder-se e a mostrar-se sem parar' -f $text) }
+        $probe = (Get-LogLinesSince $since 'taskbar probe') | Select-Object -Last 1
+        if ($probe) { Add-Result $name 'sonda' 'INFO' ([string]$probe -replace '^\S+ \S+ INFO\s+', '') }
+    }
+    finally {
+        if ($null -ne $form) {
+            try { $form.Close(); $form.Dispose() } catch { }
+        }
+    }
+
+    # 4. With the window gone the taskbar is back, and so are the bars.
+    $latched = @(Get-LogLinesSince $since 'the taskbar hides and shows').Count -gt 0
+    $back = Wait-Pumping { (Get-ModeName (Get-PlacementLine)) -notlike 'auto-*' } 7000
+    if (-not $back) {
+        if ($latched) { Add-Result $name 'voltar' 'AVISO' 'as barras ficaram a flutuar depois de fechar a janela (a app detetou o ciclo do Start11). Mexe nas barras para voltarem a encostar.' }
+        else { Add-Result $name 'voltar' 'FALHA' 'fechei a janela e as barras nao voltaram da auto-ocultacao em 7 s' }
+        return
+    }
+    Start-Sleep -Milliseconds 1200
+    $after = Get-Reading
+    Save-Screen (Join-Path $Saida ('{0}-3-depois-ecra.png' -f $name))
+    $afterBitmap = Save-Capture $after (Join-Path $Saida ('{0}-3-depois.png' -f $name))
+    $afterMode = Get-ModeName (Get-PlacementLine)
+    if ($afterMode -eq $baseMode) { Add-Result $name 'voltar' 'PASSA' ('modo de volta a {0}' -f $afterMode) }
+    else { Add-Result $name 'voltar' 'FALHA' ('o modo nao voltou: antes {0}, depois {1}' -f $baseMode, $afterMode) }
+    if ($after.WidgetFound -and (Test-SameWidget $base $after)) { Add-Result $name 'posicao' 'PASSA' ('barras de volta a {0}' -f (Get-WidgetText $after)) }
+    else { Add-Result $name 'posicao' 'FALHA' ('as barras nao voltaram: antes {0}, depois {1}' -f (Get-WidgetText $base), $(if ($after.WidgetFound) { Get-WidgetText $after } else { 'sem janela' })) }
+    $sim = Compare-Capture $baseBitmap $afterBitmap
+    if ($sim -lt 0) { Add-Result $name 'visivel-depois' 'INCONCLUSIVO' 'o tamanho da janela mudou, nao da para comparar as capturas' }
+    elseif ($sim -ge $LimiarPixeis) { Add-Result $name 'visivel-depois' 'PASSA' ('barras visiveis outra vez: {0:P0} dos pixeis iguais ao antes' -f $sim) }
+    else { Add-Result $name 'visivel-depois' 'FALHA' ('as barras nao voltaram a aparecer: {0:P0} dos pixeis iguais ao antes (limiar {1:P0})' -f $sim, $LimiarPixeis) }
+}
+
 # ---------------------------------------------------------------- watch mode
 
 function Invoke-Observar {
@@ -1150,9 +1354,12 @@ function Invoke-Main {
 Write-Host 'Nao uses o teclado nem o rato durante o teste. A comecar em 3 s...' -ForegroundColor Yellow
 Start-Sleep -Seconds 3
 
-Invoke-Case 'iniciar' 'iniciar'
-if ($VistaDeTarefas) { Invoke-Case 'vista-de-tarefas' 'vista' }
-if ($TesteCrash) { Invoke-CrashTest }
+if (-not $SoAutoOcultacao) {
+    Invoke-Case 'iniciar' 'iniciar'
+    if ($VistaDeTarefas) { Invoke-Case 'vista-de-tarefas' 'vista' }
+    if ($TesteCrash) { Invoke-CrashTest }
+}
+if ($AutoOcultacao -or $SoAutoOcultacao) { Invoke-AutoHideCase }
 
 $failures = @($script:Results | Where-Object { $_.Estado -eq 'FALHA' }).Count
 $warnings = @($script:Results | Where-Object { $_.Estado -eq 'AVISO' }).Count

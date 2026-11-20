@@ -11,6 +11,7 @@ internal static class NativeMethods
     public const int WsVisible = 0x10000000;
     public const int WsClipSiblings = 0x04000000;
     public const int WsExTopMost = 0x00000008;
+    public const int WsExLayered = 0x00080000;
     public const int WsExToolWindow = 0x00000080;
     public const int WsExNoActivate = 0x08000000;
     public const int SwHide = 0;
@@ -130,6 +131,10 @@ internal static class NativeMethods
 
     [DllImport("user32.dll")]
     public static extern bool IsWindowVisible(IntPtr hwnd);
+
+    /// <summary>Only valid for a layered window. <paramref name="flags"/> has 2 (LWA_ALPHA) when <paramref name="alpha"/> applies.</summary>
+    [DllImport("user32.dll")]
+    public static extern bool GetLayeredWindowAttributes(IntPtr hwnd, out uint colorKey, out byte alpha, out uint flags);
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     public static extern int GetClassName(IntPtr hwnd, System.Text.StringBuilder className, int maxCount);

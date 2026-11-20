@@ -254,22 +254,30 @@ internal sealed class SettingsWindow : Window
             position.IsEnabled = on;
         }
 
+        var glide = Card(
+            "Transição suave",
+            "As barras deslizam, em vez de saltarem, entre a barra de tarefas e a posição flutuante quando a barra de tarefas se auto-oculta.",
+            Toggle(Settings.GlideBars, on => Change(s => s with { GlideBars = on })));
+        glide.IsEnabled = on;
+
         var cards = new List<Control>();
         if (_hooks.FloatingHidden is { } hidden)
         {
             var toggle = FloatingToggle(hidden, enabled =>
             {
                 opacity.IsEnabled = enabled;
+                glide.IsEnabled = enabled;
                 if (position is not null)
                     position.IsEnabled = enabled;
             });
             cards.Add(Card(
                 "Barras flutuantes",
-                "Quando a ilha das janelas ocupa o espaço, as barras ficam imediatamente acima da barra de tarefas.",
+                "Quando a ilha das janelas ocupa o espaço, ou a barra de tarefas se esconde (auto-ocultação), as barras flutuam. Desligado, escondem-se.",
                 toggle));
         }
 
         cards.Add(opacity);
+        cards.Add(glide);
         if (position is not null)
             cards.Add(position);
         return Page(cards.ToArray());

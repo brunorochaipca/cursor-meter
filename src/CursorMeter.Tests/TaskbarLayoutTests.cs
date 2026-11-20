@@ -224,4 +224,64 @@ public sealed class TaskbarLayoutTests
         Assert.True(kept.Right <= Windows10Bar.Right);
         Assert.True(kept.Left >= Windows10Bar.Left);
     }
+
+    private static readonly PxRect Screen1080 = new(0, 0, 1920, 1080);
+
+    [Theory]
+    [InlineData(1032, 48)]
+    [InlineData(1060, 20)]
+    [InlineData(1078, 2)]
+    [InlineData(1080, 0)]
+    [InlineData(1200, 0)]
+    public void VisibleThickness_counts_only_what_is_on_screen(int top, int expected)
+    {
+        var bar = new PxRect(0, top, 1920, top + 48);
+
+        Assert.Equal(expected, TaskbarLayout.VisibleThickness(bar, Screen1080));
+    }
+
+    [Fact]
+    public void VisibleThickness_of_a_taskbar_on_another_screen_is_zero()
+    {
+        var other = new PxRect(1920, 0, 3840, 1080);
+        var bar = new PxRect(1920, 1032, 3840, 1080);
+
+        Assert.Equal(0, TaskbarLayout.VisibleThickness(bar, Screen1080));
+        Assert.Equal(48, TaskbarLayout.VisibleThickness(bar, other));
+    }
+
+    [Theory]
+    [InlineData(1032, false)]
+    [InlineData(1064, false)]
+    [InlineData(1066, true)]
+    [InlineData(1079, true)]
+    [InlineData(1100, true)]
+    public void IsOffScreen_is_a_taskbar_slid_away(int top, bool offScreen)
+    {
+        var bar = new PxRect(0, top, 1920, top + 48);
+
+        Assert.Equal(offScreen, TaskbarLayout.IsOffScreen(bar, Screen1080));
+    }
+
+    [Theory]
+    [InlineData(BarEdge.Bottom, 0, 1080, 1920, 1080)]
+    [InlineData(BarEdge.Top, 0, 0, 1920, 0)]
+    [InlineData(BarEdge.Left, 0, 0, 0, 1080)]
+    [InlineData(BarEdge.Right, 1920, 0, 1920, 1080)]
+    public void EdgeLine_rests_on_the_screen_edge(BarEdge edge, int left, int top, int right, int bottom)
+    {
+        Assert.Equal(new PxRect(left, top, right, bottom), TaskbarLayout.EdgeLine(Screen1080, edge));
+    }
+
+    [Fact]
+    public void Floating_bars_hug_the_edge_where_the_taskbar_hid()
+    {
+        var line = TaskbarLayout.EdgeLine(Screen1080, BarEdge.Bottom);
+
+        var slot = FloatingBars.DefaultSlot(line, Screen1080, BarEdge.Bottom, 8, 252, 44, 4);
+
+        Assert.Equal(1080 - 4 - 44, slot.Top);
+        Assert.Equal(1080 - 4, slot.Bottom);
+        Assert.Equal(8, slot.Left);
+    }
 }

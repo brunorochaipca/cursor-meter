@@ -42,8 +42,19 @@ Com muitas janelas abertas, a ilha dos ícones do Start11 cresce para a esquerda
 
 - **Esbatidas.** Ficam a cerca de 40% de opacidade e só ficam totalmente visíveis quando o rato passa por cima, para tapar o menos possível.
 - **Arrastáveis.** Aqui podem-se arrastar para qualquer ponto do ecrã, também para outro monitor. A posição fica em `%LOCALAPPDATA%\CursorMeter\floating.txt`. Se esse monitor desaparecer, voltam ao canto esquerdo.
-- **Escondíveis.** No menu (botão direito nas barras ou no ícone da área de notificação), "Esconder as barras flutuantes". Só vale enquanto não houver espaço para a ilha.
+- **Escondíveis.** No menu (botão direito nas barras ou no ícone da área de notificação), "Esconder as barras flutuantes". Só vale enquanto não houver espaço para a ilha ou a barra de tarefas estiver auto-ocultada.
 - **Voltam sozinhas.** Quando fechas janelas e a ilha volta a caber, as barras regressam ao canto da barra de tarefas. Pedem uns pixéis a mais para voltar do que para sair, para não oscilarem.
+
+## Quando a barra de tarefas se auto-oculta
+
+Com a barra de tarefas em auto-ocultação, a do Windows ou a do Start11, as barras seguem a definição **Barras flutuantes**:
+
+- **Ligada (por omissão):** as barras flutuam, esbatidas, encostadas ao canto esquerdo do ecrã, junto à borda onde a barra de tarefas se esconde. Arrastam-se como as outras barras flutuantes e partilham a mesma posição guardada.
+- **Desligada:** as barras escondem-se com a barra de tarefas.
+
+Quando a barra de tarefas volta a aparecer, as barras regressam ao seu sítio nela. Nos dois sentidos as barras deslizam durante cerca de 200 ms em vez de saltarem; a definição **Transição suave** (ligada por omissão) desliga isso. A aplicação reconhece a barra escondida pelo encolher para um fio (Windows), por a janela estar escondida, transparente ou fora do ecrã, ou por a sua região ficar vazia, que são as formas como o Start11 pode escondê-la. Cada mudança destes sinais fica no registo, em linhas `Placement: taskbar probe`.
+
+Com a opção do Start11 "Only hide when a window is maximized or overlapping the taskbar", as barras encostadas à barra de tarefas podem contar como uma janela por cima dela, e o Start11 escondê-la. Ao flutuarem, deixam de a tapar e o Start11 mostra-a outra vez, e assim por diante, várias vezes por segundo. A aplicação reconhece essa sequência (cinco mudanças seguidas em pouco tempo) e deixa as barras flutuantes, sem voltarem a encostar, até as moveres, mudares as barras flutuantes nas definições ou passarem dez minutos. Fica no registo como `the taskbar hides and shows as the bars move`.
 
 ## Definições
 
@@ -52,7 +63,7 @@ Botão direito nas barras ou no ícone da área de notificação, **Definições
 - **Aspeto:** tema (Automático, Escuro, **Transparente** ou Seguir o Start11, que no estilo Arredondado ou Sólido deixa as barras diretamente na barra, sem caixa), opacidade do fundo, contorno, cantos, tamanho do texto, mostrar uma só pool e mostrar o que resta em vez do que usaste.
 - **Cores:** texto, texto secundário, as duas pools, aviso, crítico e contorno. Para o tema transparente, escolhe um texto claro ou escuro conforme a tua barra de tarefas.
 - **Utilização e alertas:** de quanto em quanto tempo lê a quota (1, 3, 5 ou 10 minutos) e a partir de que valor a barra passa a aviso (70% por omissão) e a crítico (90%).
-- **Barras flutuantes:** ligar ou desligar. Com elas ligadas, opacidade em repouso e repor a posição.
+- **Barras flutuantes:** ligar ou desligar. Com elas ligadas, opacidade em repouso, transição suave (deslizar em vez de saltar quando a barra de tarefas se auto-oculta) e repor a posição.
 - **Geral:** iniciar com o Windows, esconder as barras em ecrã inteiro (ligado por omissão) e repor todas as definições. Com isto ligado, as barras desaparecem enquanto um jogo, um vídeo ou outra aplicação ocupa o ecrã todo e voltam quando ela sai. A app usa o mesmo estado do Windows que suspende as notificações nessa situação, por isso uma janela só maximizada não conta.
 
 O tema, a opacidade, o contorno e os cantos valem só **fora do modo ilha**: na caixa junto ao relógio, no Windows 10 e quando as barras flutuam. Como ilha da barra de tarefas, as barras seguem sempre as cores do Start11. O tema transparente não foi testado no Windows 10.

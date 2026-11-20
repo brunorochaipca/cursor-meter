@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Threading;
@@ -48,6 +49,18 @@ internal sealed class TaskbarEmbedder : IDisposable
     private bool _holeOpen;
     private bool _regionOwnedElsewhere;
     private bool _fullscreen;
+    private bool _autoHidden;
+    private readonly HideLoopGuard _loopGuard = new();
+    private readonly HideDebounce _hideDebounce = new();
+    private bool _placedAutoHidden;
+    private bool _glideNext;
+    private readonly DispatcherTimer _glideTimer;
+    private readonly Stopwatch _glideClock = new();
+    private PxRect _glideFrom;
+    private PxRect _glideTo;
+    private bool _glideTopmost;
+    private BarEdge _lastEdge = BarEdge.Bottom;
+    private string? _lastProbe;
     private PxRect _holeSlot;
     private readonly RegionCutGuard _cutGuard = new();
 
@@ -67,13 +80,20 @@ internal sealed class TaskbarEmbedder : IDisposable
         _fullscreenTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
         _fullscreenTimer.Tick += (_, _) => OnFullscreenTick();
         _fullscreenTimer.Start();
+        _glideTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(15) };
+        _glideTimer.Tick += (_, _) => OnGlideTick();
         FloatingSettings.Changed += OnFloatingSettingsChanged;
         SettingsStore.Changed += OnSettingsChanged;
         WatchTaskbar();
     }
 
     private void OnFloatingSettingsChanged(object? sender, EventArgs e) =>
-        Dispatcher.UIThread.Post(() => Place());
+        Dispatcher.UIThread.Post(() =>
+        {
+            // Turning the floating bars on or off, or resetting their position, is a fresh start.
+            ReleaseLatch("floating bars changed");
+            Place();
+        });
 
     private void OnSettingsChanged(object? sender, EventArgs e) =>
         Dispatcher.UIThread.Post(OnFullscreenTick);
@@ -93,8 +113,10 @@ internal sealed class TaskbarEmbedder : IDisposable
         if (!_widget.IsAlive)
             return;
 
+        // The taskbar can hide or show without any window event, so it is read on this timer too.
         bool now = FullscreenAppActive();
-        if (now == _fullscreen)
+        bool hiddenNow = !now && TaskbarAutoHiddenNow();
+        if (now == _fullscreen && hiddenNow == _autoHidden)
             return;
 
         _fullscreen = now;
@@ -116,6 +138,9 @@ internal sealed class TaskbarEmbedder : IDisposable
 
         if (_fullscreen)
         {
+            _autoHidden = false;
+            _placedAutoHidden = false;
+            _hideDebounce.Reset();
             Mode("full-screen application in front, bars hidden");
             HoldHidden();
             return;
@@ -124,25 +149,64 @@ internal sealed class TaskbarEmbedder : IDisposable
         var taskbar = NativeMethods.FindWindow("Shell_TrayWnd", null);
         if (taskbar == IntPtr.Zero || !NativeMethods.GetWindowRect(taskbar, out var taskbarRect))
         {
+            _autoHidden = false;
+            _placedAutoHidden = false;
+            _hideDebounce.Reset();
             DockFallback();
             return;
         }
 
         var taskbarPx = ToPx(taskbarRect);
         bool overlay = DrawOverTaskbar(taskbar);
-        if (TaskbarLayout.IsCollapsed(taskbarPx))
+        var monitor = MonitorOf(taskbar, taskbarRect);
+        if (overlay)
+            LogProbe(taskbar, taskbarPx, monitor);
+        string? hiddenReason = overlay
+            ? AutoHiddenReason(taskbar, taskbarPx, monitor)
+            : TaskbarLayout.IsCollapsed(taskbarPx) ? "collapsed to a sliver" : null;
+        _autoHidden = overlay && hiddenReason is not null;
+        if (overlay)
         {
-            // A child is clipped by the shrunk taskbar. An overlay would sit on the desktop edge.
-            Mode("taskbar collapsed, bars hidden");
+            TrackHideFlips(_autoHidden, $"{_delta} {Describe(taskbarPx)}");
+            // Start11 counts the docked bars as a window over the taskbar and hides it, and shows it again
+            // once they float away. While that goes on, the bars stay as they are when it is hidden.
+            if (_loopGuard.Latched && hiddenReason is null)
+                hiddenReason = "the taskbar kept hiding and showing as the bars moved";
+
+            // Start11 dips the taskbar to almost invisible for a moment now and then. The bars leave it only
+            // when it stays hidden, and look again shortly if it was only a dip.
+            bool confirmed = _hideDebounce.Confirm(hiddenReason is not null, _placedAutoHidden, Environment.TickCount64)
+                || _loopGuard.Latched;
+            if (hiddenReason is not null && !confirmed)
+            {
+                _settleRemaining = 4;
+                _settleTimer.Stop();
+                _settleTimer.Start();
+                return;
+            }
+        }
+
+        if (hiddenReason is not null)
+        {
             if (overlay)
-                HoldHidden();
+            {
+                PlaceAutoHidden(taskbar, taskbarPx, monitor, hiddenReason);
+                return;
+            }
+
+            // A child is clipped by the shrunk taskbar, so it goes away with it.
+            Mode("taskbar collapsed, bars hidden");
             return;
         }
 
-        var monitor = MonitorOf(taskbar, taskbarRect);
+        // Back from auto-hide: the bars glide back to where they dock.
+        _glideNext = _placedAutoHidden;
+        _placedAutoHidden = false;
+
         var tray = FindTray(taskbar);
         var trayPx = tray != IntPtr.Zero && NativeMethods.GetWindowRect(tray, out var found) ? ToPx(found) : default;
         var edge = TaskbarLayout.DetectEdge(taskbarPx, monitor);
+        _lastEdge = edge;
         int dpi = DpiOf(taskbar);
         _widget.Vertical = TaskbarLayout.IsVertical(edge);
         var (width, height) = TaskbarLayout.FitSize(taskbarPx, edge, dpi);
@@ -261,6 +325,182 @@ internal sealed class TaskbarEmbedder : IDisposable
         DockOver(slot, lifted: false);
     }
 
+    /// <summary>Feeds the loop guard and logs when it latches or lets go.</summary>
+    private void TrackHideFlips(bool hiddenNow, string key)
+    {
+        switch (_loopGuard.Report(hiddenNow, key, Environment.TickCount64, _widget.IsDragging))
+        {
+            case HideLoopChange.Latched:
+                AppLog.Info("Placement: the taskbar hides and shows as the bars move, the bars stay floating until moved");
+                break;
+            case HideLoopChange.Released:
+                AppLog.Info("Placement: the bars may dock again (the bars or the taskbar moved)");
+                break;
+        }
+    }
+
+    private void ReleaseLatch(string why)
+    {
+        if (!_loopGuard.Latched)
+        {
+            _loopGuard.Release();
+            return;
+        }
+
+        _loopGuard.Release();
+        AppLog.Info($"Placement: the bars may dock again ({why})");
+    }
+
+    /// <summary>
+    /// The taskbar is auto-hidden, by Windows or by Start11. With the floating bars on they stay in
+    /// view, faded and draggable, against the screen edge where the taskbar rests. With them off the
+    /// bars go away with the taskbar and come back when it shows again.
+    /// </summary>
+    private void PlaceAutoHidden(IntPtr taskbar, PxRect taskbarPx, PxRect monitor, string reason)
+    {
+        // Entering auto-hide from the taskbar: the bars glide to the floating place. Already there, a
+        // new slot (a dragged place, a changed setting) is taken at once.
+        _glideNext = !_placedAutoHidden;
+        _placedAutoHidden = true;
+        ReleaseHole(taskbar);
+        int dpi = DpiOf(taskbar);
+        // A hidden taskbar may keep its old rectangle, shrink to a sliver or lie off the screen. Only
+        // a rectangle with nothing in it says nothing about the edge.
+        var edge = taskbarPx.IsEmpty ? _lastEdge : TaskbarLayout.DetectEdge(taskbarPx, monitor);
+        _widget.Vertical = TaskbarLayout.IsVertical(edge);
+        _onIsland = false;
+        _floating = true;
+        _widget.Floating = true;
+        _widget.ShowIsland(null);
+        if (FloatingSettings.State.Hidden)
+        {
+            Mode($"taskbar auto-hidden ({reason}), floating bars are off, bars hidden");
+            HoldHidden();
+            return;
+        }
+
+        var (width, height) = TaskbarLayout.FitSize(taskbarPx, edge, dpi);
+        // Start11 hides the taskbar and leaves its rectangle where it was. The bars then float just above
+        // that rectangle, which is also where they float when the taskbar shows, so they never move onto
+        // it. Windows shrinks or slides its taskbar away, and there the bars rest on the screen edge.
+        var anchor = TaskbarLayout.IsOffScreen(taskbarPx, monitor) || TaskbarLayout.IsCollapsed(taskbarPx)
+            ? TaskbarLayout.EdgeLine(monitor, edge)
+            : taskbarPx;
+        var home = FloatingBars.DefaultSlot(
+            anchor,
+            monitor,
+            edge,
+            TaskbarLayout.Scale(8, dpi),
+            width,
+            height,
+            TaskbarLayout.Scale(FloatingBars.Gap, dpi));
+        var slot = FloatingBars.Resolve(FloatingSettings.State, home, Monitors());
+        Mode($"taskbar auto-hidden ({reason}), bars float at the screen edge, slot {Describe(slot)}, dpi {dpi}");
+        DockOver(slot, lifted: false);
+    }
+
+    /// <summary>
+    /// Why the taskbar counts as auto-hidden, or null when it is in view. Windows shrinks its taskbar to
+    /// a sliver. Start11 has its own auto-hide, and which way it hides the window is not known, so
+    /// every way is checked: hidden, cloaked, faded out, slid off the screen or cut to nothing.
+    /// </summary>
+    private static string? AutoHiddenReason(IntPtr taskbar, PxRect taskbarPx, PxRect monitor)
+    {
+        if (TaskbarLayout.IsCollapsed(taskbarPx))
+            return "collapsed to a sliver";
+        if (!NativeMethods.IsWindowVisible(taskbar))
+            return "window hidden";
+        if (IsCloaked(taskbar))
+            return "window cloaked";
+        if (LayerAlpha(taskbar) is { } alpha && alpha < FadedAlpha)
+            return "window faded out";
+        if (TaskbarLayout.IsOffScreen(taskbarPx, monitor))
+            return "slid off the screen";
+        if (RegionHidesTaskbar(taskbar))
+            return "region cut to nothing";
+        return null;
+    }
+
+    /// <summary>Opacity below which a layered taskbar counts as invisible.</summary>
+    private const byte FadedAlpha = 16;
+
+    private static bool IsCloaked(IntPtr window)
+    {
+        try
+        {
+            return NativeMethods.DwmGetWindowAttribute(window, DwmaCloaked, out int cloaked, sizeof(int)) == 0 && cloaked != 0;
+        }
+        catch (Exception ex) when (ex is EntryPointNotFoundException or DllNotFoundException)
+        {
+            return false;
+        }
+    }
+
+    private const int DwmaCloaked = 14;
+
+    /// <summary>The opacity of a layered window, or null when it is not layered or has no opacity set.</summary>
+    private static byte? LayerAlpha(IntPtr window)
+    {
+        int exStyle = NativeMethods.GetWindowLong(window, NativeMethods.GwlExStyle);
+        if ((exStyle & NativeMethods.WsExLayered) == 0)
+            return null;
+        return NativeMethods.GetLayeredWindowAttributes(window, out _, out byte alpha, out uint flags) && (flags & LwaAlpha) != 0
+            ? alpha
+            : null;
+    }
+
+    private const uint LwaAlpha = 2;
+
+    /// <summary>
+    /// True when the taskbar has a region that leaves nothing, or a sliver, of it in view. A taskbar in a
+    /// higher band, which is what opening Start does, is not read: there Start11 swaps regions as well.
+    /// </summary>
+    private static bool RegionHidesTaskbar(IntPtr taskbar)
+    {
+        if (TaskbarRaised(taskbar))
+            return false;
+
+        int kind = RegionKind(taskbar);
+        if (kind == NullRegion)
+            return true;
+        if (kind < NativeMethods.SimpleRegion)
+            return false;
+
+        var rects = RegionRects(taskbar);
+        if (rects.Count == 0)
+            return false;
+        int left = rects.Min(r => r.Left);
+        int top = rects.Min(r => r.Top);
+        int right = rects.Max(r => r.Right);
+        int bottom = rects.Max(r => r.Bottom);
+        return TaskbarLayout.IsCollapsed(new PxRect(left, top, right, bottom));
+    }
+
+    /// <summary>True when the taskbar is auto-hidden now. Polled, as a taskbar can hide without an event.</summary>
+    private bool TaskbarAutoHiddenNow()
+    {
+        var taskbar = NativeMethods.FindWindow("Shell_TrayWnd", null);
+        if (taskbar == IntPtr.Zero || !NativeMethods.GetWindowRect(taskbar, out var rect) || !DrawOverTaskbar(taskbar))
+            return false;
+        return AutoHiddenReason(taskbar, ToPx(rect), MonitorOf(taskbar, rect)) is not null;
+    }
+
+    /// <summary>
+    /// Logs what the taskbar window looks like whenever one of the signals for auto-hide changes, so a
+    /// way of hiding that is not recognised yet shows up in the log.
+    /// </summary>
+    private void LogProbe(IntPtr taskbar, PxRect taskbarPx, PxRect monitor)
+    {
+        string key = $"visible={NativeMethods.IsWindowVisible(taskbar)} cloaked={IsCloaked(taskbar)} "
+            + $"alpha={(LayerAlpha(taskbar) is { } alpha ? alpha.ToString() : "-")} region={RegionKind(taskbar)} "
+            + $"raised={TaskbarRaised(taskbar)} offscreen={TaskbarLayout.IsOffScreen(taskbarPx, monitor)} "
+            + $"collapsed={TaskbarLayout.IsCollapsed(taskbarPx)}";
+        if (key == _lastProbe)
+            return;
+        _lastProbe = key;
+        AppLog.Info($"Placement: taskbar probe {key}; taskbar {Describe(taskbarPx)}, screen {Describe(monitor)}");
+    }
+
     public void DragTo(int screenLeft, int screenTop)
     {
         if (_floating)
@@ -305,11 +545,13 @@ internal sealed class TaskbarEmbedder : IDisposable
         _settleTimer.Stop();
         _orderTimer.Stop();
         _fullscreenTimer.Stop();
+        StopGlide();
         Unhook();
     }
 
     private void Embed(IntPtr taskbar, PxRect taskbarPx, PxRect screenSlot, bool allowReparent)
     {
+        StopGlide();
         var local = new PxRect(
             screenSlot.Left - taskbarPx.Left,
             screenSlot.Top - taskbarPx.Top,
@@ -605,6 +847,74 @@ internal sealed class TaskbarEmbedder : IDisposable
 
     private void ShowSlot(PxRect slot, bool topmost)
     {
+        bool glide = _glideNext && SettingsStore.Current.GlideBars;
+        _glideNext = false;
+        if (_glideTimer.IsEnabled)
+        {
+            // Already gliding there; the same placement asked again must not restart it.
+            if (_glideTo == slot && _glideTopmost == topmost)
+                return;
+            _glideTimer.Stop();
+        }
+
+        if (glide
+            && topmost
+            && !_widget.HeldHidden
+            && !_widget.IsDragging
+            && NativeMethods.IsWindowVisible(_widget.Handle)
+            && NativeMethods.GetWindowRect(_widget.Handle, out var now))
+        {
+            var from = new PxRect(now.Left, now.Top, now.Right, now.Bottom);
+            if (from != slot && !from.IsEmpty)
+            {
+                _glideFrom = from;
+                _glideTo = slot;
+                _glideTopmost = topmost;
+                _glideClock.Restart();
+                _glideTimer.Start();
+                return;
+            }
+        }
+
+        SetSlot(slot, topmost);
+    }
+
+    private void OnGlideTick()
+    {
+        if (!_widget.IsAlive || _widget.IsDragging || _widget.HeldHidden)
+        {
+            _glideTimer.Stop();
+            return;
+        }
+
+        long elapsed = _glideClock.ElapsedMilliseconds;
+        if (elapsed >= SlotGlide.DurationMs)
+        {
+            _glideTimer.Stop();
+            SetSlot(_glideTo, _glideTopmost);
+            return;
+        }
+
+        var step = SlotGlide.At(_glideFrom, _glideTo, elapsed);
+        _widget.LockedSlot = step;
+        NativeMethods.SetWindowPos(
+            _widget.Handle,
+            _glideTopmost ? NativeMethods.HwndTopMost : IntPtr.Zero,
+            step.Left,
+            step.Top,
+            step.Width,
+            step.Height,
+            NativeMethods.SwpNoActivate | NativeMethods.SwpShowWindow);
+    }
+
+    private void StopGlide()
+    {
+        _glideNext = false;
+        _glideTimer.Stop();
+    }
+
+    private void SetSlot(PxRect slot, bool topmost)
+    {
         _widget.LockedSlot = slot;
         NativeMethods.SetWindowPos(
             _widget.Handle,
@@ -769,6 +1079,7 @@ internal sealed class TaskbarEmbedder : IDisposable
 
     private void HoldHidden()
     {
+        StopGlide();
         ReleaseHole(NativeMethods.FindWindow("Shell_TrayWnd", null));
         _orderTimer.Stop();
         Embedded = _widget.Embedded = false;

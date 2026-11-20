@@ -68,6 +68,32 @@ public static class TaskbarLayout
         return thickness < CollapsedThickness;
     }
 
+    /// <summary>
+    /// How many pixels of the taskbar's thickness lie on <paramref name="monitor"/>. A taskbar that an
+    /// auto-hide slid off the screen keeps its size but leaves a sliver or nothing in view.
+    /// </summary>
+    public static int VisibleThickness(PxRect taskbar, PxRect monitor)
+    {
+        int width = Math.Min(taskbar.Right, monitor.Right) - Math.Max(taskbar.Left, monitor.Left);
+        int height = Math.Min(taskbar.Bottom, monitor.Bottom) - Math.Max(taskbar.Top, monitor.Top);
+        return Math.Max(0, Math.Min(width, height));
+    }
+
+    /// <summary>True when too little of the taskbar is on screen for the bars to sit in it.</summary>
+    public static bool IsOffScreen(PxRect taskbar, PxRect monitor) => VisibleThickness(taskbar, monitor) < CollapsedThickness;
+
+    /// <summary>
+    /// The line along the screen edge where an auto-hidden taskbar rests. The floating bars are placed
+    /// against it, so they hug the edge whatever way the taskbar was hidden.
+    /// </summary>
+    public static PxRect EdgeLine(PxRect monitor, BarEdge edge) => edge switch
+    {
+        BarEdge.Top => new PxRect(monitor.Left, monitor.Top, monitor.Right, monitor.Top),
+        BarEdge.Left => new PxRect(monitor.Left, monitor.Top, monitor.Left, monitor.Bottom),
+        BarEdge.Right => new PxRect(monitor.Right, monitor.Top, monitor.Right, monitor.Bottom),
+        _ => new PxRect(monitor.Left, monitor.Bottom, monitor.Right, monitor.Bottom),
+    };
+
     public static BarEdge DetectEdge(PxRect taskbar, PxRect screen)
     {
         bool horizontal = taskbar.Width >= taskbar.Height;

@@ -31,6 +31,7 @@ public sealed class AppSettingsTests
             WarnAt = 60,
             HotAt = 85,
             FadedOpacity = 25,
+            GlideBars = false,
             Pools = PoolView.CursorOnly,
             ShowRemaining = true,
             HideInFullscreen = false,
@@ -46,6 +47,15 @@ public sealed class AppSettingsTests
         Assert.True(AppSettings.Parse("Theme=Dark").HideInFullscreen);
         Assert.False(AppSettings.Parse("HideInFullscreen=0").HideInFullscreen);
         Assert.True(AppSettings.Parse("HideInFullscreen=maybe").HideInFullscreen);
+    }
+
+    [Fact]
+    public void The_bars_glide_unless_the_user_turns_it_off()
+    {
+        Assert.True(AppSettings.Default.GlideBars);
+        Assert.True(AppSettings.Parse("Theme=Dark").GlideBars);
+        Assert.False(AppSettings.Parse("GlideBars=0").GlideBars);
+        Assert.True(AppSettings.Parse("GlideBars=maybe").GlideBars);
     }
 
     [Fact]
