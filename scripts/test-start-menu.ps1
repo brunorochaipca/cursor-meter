@@ -48,7 +48,7 @@
     limpa o recorte no fim. Pede confirmacao, a menos que se use -Sim.
 
 .PARAMETER AutoOcultacao
-    Acrescenta o caso da auto-ocultacao da barra de tarefas (Windows ou Start11, tambem no v1/v2). Maximiza uma
+    Acrescenta o caso da auto-ocultacao da barra de tarefas (Windows 11 com Start11, testado no v2; so existe com as barras por cima da barra de tarefas, nao no Windows 10 sem Start11). Maximiza uma
     janela do proprio script, espera que a barra de tarefas se esconda e confere:
       - o modo das barras: flutuantes (definicao "Barras flutuantes" ligada) ou escondidas (desligada), lido de
         %LOCALAPPDATA%\CursorMeter\floating.txt e do registo da app;

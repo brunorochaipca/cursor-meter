@@ -256,7 +256,7 @@ internal sealed class SettingsWindow : Window
 
         var glide = Card(
             "Transição suave",
-            "As barras deslizam, em vez de saltarem, entre a barra de tarefas e a posição flutuante quando a barra de tarefas se auto-oculta.",
+            "As barras deslizam, em vez de saltarem, entre a barra de tarefas e a posição flutuante quando a barra de tarefas do Windows 11 se auto-oculta.",
             Toggle(Settings.GlideBars, on => Change(s => s with { GlideBars = on })));
         glide.IsEnabled = on;
 
@@ -272,7 +272,7 @@ internal sealed class SettingsWindow : Window
             });
             cards.Add(Card(
                 "Barras flutuantes",
-                "Quando a ilha das janelas ocupa o espaço, ou a barra de tarefas se esconde (auto-ocultação), as barras flutuam. Desligado, escondem-se.",
+                "Quando a ilha das janelas ocupa o espaço, ou, no Windows 11, a barra de tarefas se auto-oculta, as barras flutuam. Desligado, escondem-se.",
                 toggle));
         }
 

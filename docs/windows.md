@@ -42,12 +42,16 @@ Com muitas janelas abertas, a ilha dos ícones do Start11 cresce para a esquerda
 
 - **Esbatidas.** Ficam a cerca de 40% de opacidade e só ficam totalmente visíveis quando o rato passa por cima, para tapar o menos possível.
 - **Arrastáveis.** Aqui podem-se arrastar para qualquer ponto do ecrã, também para outro monitor. A posição fica em `%LOCALAPPDATA%\CursorMeter\floating.txt`. Se esse monitor desaparecer, voltam ao canto esquerdo.
-- **Escondíveis.** No menu (botão direito nas barras ou no ícone da área de notificação), "Esconder as barras flutuantes". Só vale enquanto não houver espaço para a ilha ou a barra de tarefas estiver auto-ocultada.
+- **Escondíveis.** No menu (botão direito nas barras ou no ícone da área de notificação), "Esconder as barras flutuantes". Só vale enquanto não houver espaço para a ilha ou, no Windows 11, a barra de tarefas estiver auto-ocultada.
 - **Voltam sozinhas.** Quando fechas janelas e a ilha volta a caber, as barras regressam ao canto da barra de tarefas. Pedem uns pixéis a mais para voltar do que para sair, para não oscilarem.
 
 ## Quando a barra de tarefas se auto-oculta
 
-Com a barra de tarefas em auto-ocultação, a do Windows ou a do Start11, as barras seguem a definição **Barras flutuantes**:
+**Só no Windows 11.** Aqui as barras são uma janela por cima da barra de tarefas, por isso podem ficar à vista quando ela se esconde. Foi testado com o **Start11 v2**, que esconde a barra sem a mover. A auto-ocultação do próprio Windows 11, sem Start11, está tratada no código mas ainda não foi experimentada.
+
+No **Windows 10 sem Start11** as barras são filhas da barra de tarefas e desaparecem com ela, tal como a ilha. Nada disto se aplica: não há barras flutuantes nem transição suave na auto-ocultação.
+
+Com a barra de tarefas do Windows 11 em auto-ocultação, as barras seguem a definição **Barras flutuantes**:
 
 - **Ligada (por omissão):** as barras flutuam, esbatidas, encostadas ao canto esquerdo do ecrã, junto à borda onde a barra de tarefas se esconde. Arrastam-se como as outras barras flutuantes e partilham a mesma posição guardada.
 - **Desligada:** as barras escondem-se com a barra de tarefas.
@@ -63,7 +67,7 @@ Botão direito nas barras ou no ícone da área de notificação, **Definições
 - **Aspeto:** tema (Automático, Escuro, **Transparente** ou Seguir o Start11, que no estilo Arredondado ou Sólido deixa as barras diretamente na barra, sem caixa), opacidade do fundo, contorno, cantos, tamanho do texto, mostrar uma só pool e mostrar o que resta em vez do que usaste.
 - **Cores:** texto, texto secundário, as duas pools, aviso, crítico e contorno. Para o tema transparente, escolhe um texto claro ou escuro conforme a tua barra de tarefas.
 - **Utilização e alertas:** de quanto em quanto tempo lê a quota (1, 3, 5 ou 10 minutos) e a partir de que valor a barra passa a aviso (70% por omissão) e a crítico (90%).
-- **Barras flutuantes:** ligar ou desligar. Com elas ligadas, opacidade em repouso, transição suave (deslizar em vez de saltar quando a barra de tarefas se auto-oculta) e repor a posição.
+- **Barras flutuantes:** ligar ou desligar. Com elas ligadas, opacidade em repouso, transição suave (deslizar em vez de saltar quando a barra de tarefas do Windows 11 se auto-oculta) e repor a posição.
 - **Geral:** iniciar com o Windows, esconder as barras em ecrã inteiro (ligado por omissão) e repor todas as definições. Com isto ligado, as barras desaparecem enquanto um jogo, um vídeo ou outra aplicação ocupa o ecrã todo e voltam quando ela sai. A app usa o mesmo estado do Windows que suspende as notificações nessa situação, por isso uma janela só maximizada não conta.
 
 O tema, a opacidade, o contorno e os cantos valem só **fora do modo ilha**: na caixa junto ao relógio, no Windows 10 e quando as barras flutuam. Como ilha da barra de tarefas, as barras seguem sempre as cores do Start11. O tema transparente não foi testado no Windows 10.
