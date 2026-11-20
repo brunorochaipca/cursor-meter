@@ -145,13 +145,33 @@ internal sealed partial class FlyoutWindow : Window
     }
 
     /// <param name="centered">Opens the card centred on the anchor instead of lined up with its left edge.</param>
-    public void ShowNear(PixelRect? anchor, bool centered = false)
+    /// <param name="follow">
+    /// Where the anchor is now. The bars float up when the apps island takes their room, and they glide
+    /// there, so the card is placed again whenever the anchor has moved.
+    /// </param>
+    public void ShowNear(PixelRect? anchor, bool centered = false, Func<PixelRect?>? follow = null)
     {
         _anchor = anchor;
         _centered = centered;
         Show();
         Activate();
+        if (follow is null)
+            return;
+        _followTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(80) };
+        _followTimer.Tick += (_, _) =>
+        {
+            if (_closing)
+                return;
+            if (follow() is { } now && now != _anchor)
+            {
+                _anchor = now;
+                Reposition();
+            }
+        };
+        _followTimer.Start();
     }
+
+    private DispatcherTimer? _followTimer;
 
     protected override void OnKeyDown(KeyEventArgs e)
     {
@@ -163,6 +183,7 @@ internal sealed partial class FlyoutWindow : Window
     protected override void OnClosing(WindowClosingEventArgs e)
     {
         _closing = true;
+        _followTimer?.Stop();
         base.OnClosing(e);
     }
 

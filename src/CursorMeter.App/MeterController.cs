@@ -263,7 +263,8 @@ internal sealed class MeterController : IDisposable
         // On Windows the bars are the anchor and the card lines up with them. On Linux the anchor is the
         // extension's bars in the taskbar, and the card opens centred above them.
         var panelAnchor = _taskbar is null && _panelFeed?.ExtensionActive == true ? _panelFeed.ReadAnchor() : null;
-        flyout.ShowNear(_taskbar?.Anchor ?? panelAnchor, centered: panelAnchor is not null);
+        flyout.ShowNear(_taskbar?.Anchor ?? panelAnchor, centered: panelAnchor is not null,
+            follow: _taskbar is null ? null : () => _taskbar?.Anchor);
     }
 
     // ExtraSpend. Delete with the ExtraSpend folders.

@@ -1,4 +1,4 @@
-using Avalonia;
+﻿using Avalonia;
 using Avalonia.Threading;
 
 namespace CursorMeter.App.ExtraSpend;
@@ -12,7 +12,7 @@ internal sealed class ExtraSpendFeature : IDisposable
 {
     public const int PollSeconds = 10;
 
-    private DateTime _lastJumpAt;
+    private readonly ExtraSpendQuiet _quiet = new();
 
     private readonly Func<Task> _poll;
     private readonly Func<(PixelRect? Anchor, bool Centered)> _anchor;
@@ -59,12 +59,15 @@ internal sealed class ExtraSpendFeature : IDisposable
             return;
         if (_window is { IsVisible: true })
         {
+            // Closing it from the menu is dismissing it by hand, as the minimize button is.
             _openedByJump = false;
+            _quiet.Minimize();
             _window.CloseQuiet();
             return;
         }
 
         _openedByJump = false;
+        _quiet.Reopen();
         _closeSummary();
         Open(activate: true);
     }
@@ -126,7 +129,9 @@ internal sealed class ExtraSpendFeature : IDisposable
     {
         if (_disposed)
             return;
-        _lastJumpAt = DateTime.UtcNow;
+        // A minimized graph does not come back inside the same stretch of spending.
+        if (!_quiet.Jumped(DateTimeOffset.Now, KeepFor()))
+            return;
         if (_window is { IsVisible: true })
         {
             Redraw();
@@ -143,7 +148,8 @@ internal sealed class ExtraSpendFeature : IDisposable
         var window = Ensure();
         var place = _anchor();
         window.ShowReading(Current(), CeilingCents());
-        window.ShowNear(place.Anchor, place.Centered, activate);
+        // On Windows the bars can move (they float up when the apps island takes their room): follow them.
+        window.ShowNear(place.Anchor, place.Centered, activate, place.Centered ? null : () => _anchor().Anchor);
     }
 
     private void Redraw()
@@ -160,7 +166,7 @@ internal sealed class ExtraSpendFeature : IDisposable
         var view = Current();
         // A graph a jump opened stays for the time the user chose after the last jump: closing after one
         // quiet minute and opening again at the next charge would start the picture over each time.
-        if (_openedByJump && !view.Busy && DateTime.UtcNow - _lastJumpAt > TimeSpan.FromMinutes(SettingsStore.Current.ExtraKeepMinutes))
+        if (_openedByJump && !view.Busy && _quiet.IdleFor(DateTimeOffset.Now) > KeepFor())
         {
             _openedByJump = false;
             _window.CloseQuiet();
@@ -178,6 +184,9 @@ internal sealed class ExtraSpendFeature : IDisposable
 
     private static int CeilingCents() => SettingsStore.Current.ExtraCeiling * 100;
 
+    /// <summary>The user's "time with the graph open": the quiet period that ends a stretch of spending.</summary>
+    private static TimeSpan KeepFor() => TimeSpan.FromMinutes(SettingsStore.Current.ExtraKeepMinutes);
+
     private SpendWindow Ensure()
     {
         if (_window is not null)
@@ -190,6 +199,8 @@ internal sealed class ExtraSpendFeature : IDisposable
                 return;
             _window = null;
             _openedByJump = false;
+            if (window.WasMinimized)
+                _quiet.Minimize();
             if (!window.WasQuiet)
                 _onUserDismissed();
         };

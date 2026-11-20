@@ -311,6 +311,56 @@ public sealed class ExtraSpendTests
     }
 
     [Fact]
+    public void Without_a_minimize_every_consumption_may_open_the_graph()
+    {
+        var now = DateTimeOffset.Now;
+        var quiet = new ExtraSpendQuiet();
+        var keep = TimeSpan.FromMinutes(2);
+
+        Assert.True(quiet.Jumped(now, keep));
+        Assert.True(quiet.Jumped(now.AddSeconds(20), keep));
+        Assert.True(quiet.Jumped(now.AddMinutes(10), keep));
+    }
+
+    [Fact]
+    public void A_minimized_graph_stays_away_until_the_spending_has_been_quiet_for_the_chosen_time()
+    {
+        var now = DateTimeOffset.Now;
+        var quiet = new ExtraSpendQuiet();
+        var keep = TimeSpan.FromMinutes(2);
+        Assert.True(quiet.Jumped(now, keep));
+
+        quiet.Minimize();
+
+        // Spending goes on: still the same stretch, and each consumption renews the wait.
+        Assert.False(quiet.Jumped(now.AddSeconds(30), keep));
+        Assert.False(quiet.Jumped(now.AddSeconds(100), keep));
+        Assert.False(quiet.Jumped(now.AddSeconds(200), keep));
+        Assert.True(quiet.Minimized);
+
+        // Two quiet minutes later a new stretch starts and may open it.
+        Assert.True(quiet.Jumped(now.AddSeconds(200 + 121), keep));
+        Assert.False(quiet.Minimized);
+        Assert.True(quiet.Jumped(now.AddSeconds(200 + 130), keep));
+    }
+
+    [Fact]
+    public void Asking_for_the_graph_ends_the_wait_and_the_idle_time_is_counted_from_the_last_consumption()
+    {
+        var now = DateTimeOffset.Now;
+        var quiet = new ExtraSpendQuiet();
+        var keep = TimeSpan.FromMinutes(2);
+        Assert.True(quiet.IdleFor(now) > TimeSpan.FromDays(1));
+        quiet.Jumped(now, keep);
+        Assert.Equal(TimeSpan.FromSeconds(45), quiet.IdleFor(now.AddSeconds(45)));
+
+        quiet.Minimize();
+        quiet.Reopen();
+
+        Assert.True(quiet.Jumped(now.AddSeconds(50), keep));
+    }
+
+    [Fact]
     public void A_charge_stamped_in_the_future_never_hides_the_graph()
     {
         var now = DateTimeOffset.Now;

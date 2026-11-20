@@ -90,7 +90,7 @@ internal sealed class SpendWindow : Window
             Content = new PathIcon { Width = 12, Height = 12, Data = Geometry.Parse("M2 11h20v2H2z") },
         };
         ToolTip.SetTip(minimize, "Minimizar");
-        minimize.Click += (_, _) => CloseQuiet();
+        minimize.Click += (_, _) => Minimize();
         var header = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto"), Margin = new Thickness(0, -4, -8, 0) };
         title.VerticalAlignment = VerticalAlignment.Center;
         header.Children.Add(title);
@@ -143,12 +143,14 @@ internal sealed class SpendWindow : Window
     /// False when a consumption jump opens it: it must not take the keyboard from what the user is typing,
     /// and a window that was never active cannot be closed by losing focus right away.
     /// </param>
-    public void ShowNear(PixelRect? anchor, bool centered = false, bool activate = true)
+    /// <param name="follow">Where the anchor is now. When it moves, the window moves with it.</param>
+    public void ShowNear(PixelRect? anchor, bool centered = false, bool activate = true, Func<PixelRect?>? follow = null)
     {
         _anchor = anchor;
         _centered = centered;
         ShowActivated = activate;
         Show();
+        StartFollowing(follow);
         if (activate)
             Activate();
     }
@@ -157,6 +159,43 @@ internal sealed class SpendWindow : Window
     {
         WasQuiet = true;
         CloseOnce();
+    }
+
+    /// <summary>True when the user dismissed it (minimize button or Esc): it must not come back by itself soon.</summary>
+    public bool WasMinimized { get; private set; }
+
+    private void Minimize()
+    {
+        WasMinimized = true;
+        CloseQuiet();
+    }
+
+    private Func<PixelRect?>? _follow;
+    private DispatcherTimer? _followTimer;
+
+    /// <summary>
+    /// Keeps the window next to a place that can move. The bars float up when the apps island takes their
+    /// room, and they glide there, so the place is read often while the window is open.
+    /// </summary>
+    private void StartFollowing(Func<PixelRect?>? source)
+    {
+        _follow = source;
+        _followTimer?.Stop();
+        _followTimer = null;
+        if (source is null)
+            return;
+        _followTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(80) };
+        _followTimer.Tick += (_, _) =>
+        {
+            if (_closing || _follow is null)
+                return;
+            if (_follow() is { } now && now != _anchor)
+            {
+                _anchor = now;
+                Reposition();
+            }
+        };
+        _followTimer.Start();
     }
 
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
@@ -173,12 +212,13 @@ internal sealed class SpendWindow : Window
     {
         base.OnKeyDown(e);
         if (e.Key == Key.Escape)
-            CloseOnce();
+            Minimize();
     }
 
     protected override void OnClosing(WindowClosingEventArgs e)
     {
         _closing = true;
+        _followTimer?.Stop();
         base.OnClosing(e);
     }
 
